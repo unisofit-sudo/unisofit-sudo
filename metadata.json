@@ -1,0 +1,6 @@
+{
+  "name": "Controle de Manutenção de Aeronaves",
+  "description": "Sistema completo para controle de manutenção de aviões, registro de componentes com controle por horas/datas, alertas de revisão e histórico de voos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

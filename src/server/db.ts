@@ -1,32 +1,10 @@
-import { Client, Pool } from 'pg';
-import fs from 'fs';
-import path from 'path';
+import { Pool } from 'pg';
 import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, RevisaoLaudo } from '../types';
 
-// Caminho para o banco local de backup/fallback
-const LOCAL_DB_PATH = path.join(process.cwd(), 'database-local.json');
-
-// Interface para a estrutura do banco em arquivo JSON (para o fallback na AI Studio)
-interface LocalSchema {
-  clientes: Cliente[];
-  aeronaves: Aeronave[];
-  historicoVoos: HistoricoVoo[];
-  componentes: ComponenteControlado[];
-  revisoes: RevisaoLaudo[];
-}
-
-const DEFAULT_SCHEMA: LocalSchema = {
-  clientes: [],
-  aeronaves: [],
-  historicoVoos: [],
-  componentes: [],
-  revisoes: [],
-};
-
 let pool: Pool | null = null;
-let useLocalDb = true;
+let dbConnectionError: string | null = null;
 
-// Determina se devemos usar PostgreSQL ou fallback local
+// Determina se devemos usar PostgreSQL
 const dbUrl = process.env.DATABASE_URL;
 const pgHost = process.env.PGHOST || process.env.POSTGRES_HOST;
 
@@ -43,143 +21,142 @@ if (dbUrl || pgHost) {
     
     pool = new Pool({
       ...config,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      max: 15,
+      idleTimeoutMillis: 30005,
+      connectionTimeoutMillis: 5000,
     });
     
-    useLocalDb = false;
     console.log('PostgreSQL Pool configurado com sucesso.');
-  } catch (err) {
-    console.error('Falha ao configurar Pool do PostgreSQL, usando banco de dados local por padrão:', err);
-    useLocalDb = true;
+  } catch (err: any) {
+    dbConnectionError = err?.message || String(err);
+    console.error('Falha ao configurar Pool do PostgreSQL:', err);
   }
 } else {
-  console.log('Nenhuma credencial do PostgreSQL encontrada. Usando banco de dados local no arquivo "database-local.json".');
-  useLocalDb = true;
+  dbConnectionError = 'Variáveis de ambiente de banco de dados (DATABASE_URL ou PGHOST) não configuradas no sistema.';
+  console.error(dbConnectionError);
 }
 
-// Inicializa tabelas no PostgreSQL ou arquivo local
+// Para exportarmos o estado do banco
+export function getDbConnectionStatus() {
+  if (dbConnectionError) {
+    return { connected: false, error: dbConnectionError };
+  }
+  if (!pool) {
+    return { connected: false, error: 'Database Pool não inicializado.' };
+  }
+  return { connected: true, error: null };
+}
+
+export function setDbConnectionError(err: string | null) {
+  dbConnectionError = err;
+}
+
+function checkPool(): Pool {
+  if (dbConnectionError) {
+    throw new Error(dbConnectionError);
+  }
+  if (!pool) {
+    throw new Error('O pool de conexão ao banco de dados não foi inicializado.');
+  }
+  return pool;
+}
+
+// Inicializa tabelas no PostgreSQL
 export async function initDb() {
-  if (!useLocalDb && pool) {
-    try {
-      const client = await pool.connect();
-      try {
-        console.log('Verificando/Criando tabelas no PostgreSQL...');
-        
-        // Criar tabelas se não existirem
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS clientes (
-            id VARCHAR(100) PRIMARY KEY,
-            nome VARCHAR(255) NOT NULL,
-            email VARCHAR(255),
-            telefone VARCHAR(50),
-            documento VARCHAR(50),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-          
-          CREATE TABLE IF NOT EXISTS aeronaves (
-            id VARCHAR(100) PRIMARY KEY,
-            matricula VARCHAR(50) UNIQUE NOT NULL,
-            modelo VARCHAR(100) NOT NULL,
-            fabricante VARCHAR(100) NOT NULL,
-            ano INTEGER,
-            horas_totais DOUBLE PRECISION DEFAULT 0,
-            cliente_id VARCHAR(100),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
-          );
-          
-          CREATE TABLE IF NOT EXISTS historico_voos (
-            id VARCHAR(100) PRIMARY KEY,
-            aeronave_id VARCHAR(100) NOT NULL,
-            data VARCHAR(20) NOT NULL,
-            horas_voo DOUBLE PRECISION NOT NULL,
-            piloto VARCHAR(255),
-            descricao TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_aeronave_voo FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
-          );
-          
-          CREATE TABLE IF NOT EXISTS componentes (
-            id VARCHAR(100) PRIMARY KEY,
-            aeronave_id VARCHAR(100) NOT NULL,
-            nome VARCHAR(255) NOT NULL,
-            part_number VARCHAR(100),
-            serial_number VARCHAR(100),
-            limite_horas DOUBLE PRECISION DEFAULT 0,
-            limite_dias INTEGER DEFAULT 0,
-            horas_instalacao DOUBLE PRECISION DEFAULT 0,
-            data_instalacao VARCHAR(20),
-            ultima_revisao_horas DOUBLE PRECISION DEFAULT 0,
-            ultima_revisao_data VARCHAR(20),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_aeronave_comp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
-          );
-          
-          CREATE TABLE IF NOT EXISTS revisoes (
-            id VARCHAR(100) PRIMARY KEY,
-            aeronave_id VARCHAR(100) NOT NULL,
-            componente_id VARCHAR(100),
-            data VARCHAR(20) NOT NULL,
-            horas_na_revisao DOUBLE PRECISION NOT NULL,
-            descricao TEXT,
-            tipo VARCHAR(50) DEFAULT 'periodica',
-            nome_anexo VARCHAR(255),
-            dados_anexo TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT fk_aeronave_rev FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE,
-            CONSTRAINT fk_componente_rev FOREIGN KEY (componente_id) REFERENCES componentes(id) ON DELETE SET NULL
-          );
-        `);
-        console.log('Tabelas PostgreSQL inicializadas com sucesso.');
-      } finally {
-        client.release();
-      }
-    } catch (err) {
-      console.error('Erro ao conectar ao PostgreSQL, trocando para banco local temporário:', err);
-      useLocalDb = true;
-      initLocalFile();
-    }
-  } else {
-    initLocalFile();
+  if (dbConnectionError) {
+    console.warn('Pulando initDb devido ao erro de configuração inicial do pool.');
+    return;
   }
-}
-
-function initLocalFile() {
-  if (!fs.existsSync(LOCAL_DB_PATH)) {
-    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(DEFAULT_SCHEMA, null, 2), 'utf8');
-    console.log('Arquivo database-local.json criado.');
-  } else {
-    try {
-      const data = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
-      JSON.parse(data);
-      console.log('Banco de dados local em database-local.json carregado com sucesso.');
-    } catch (e) {
-      console.warn('Erro ao ler arquivo local existente. Reiniciando-o.');
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(DEFAULT_SCHEMA, null, 2), 'utf8');
-    }
+  if (!pool) {
+    dbConnectionError = 'PostgreSQL Pool não configurado.';
+    return;
   }
-}
-
-// Helpers para leitura e escrita no arquivo JSON local
-function readLocalDb(): LocalSchema {
+  
   try {
-    const data = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (e) {
-    return DEFAULT_SCHEMA;
+    const client = await pool.connect();
+    try {
+      console.log('Verificando/Criando tabelas no PostgreSQL...');
+      
+      // Criar tabelas se não existirem
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS clientes (
+          id VARCHAR(100) PRIMARY KEY,
+          nome VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
+          telefone VARCHAR(50),
+          documento VARCHAR(50),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS aeronaves (
+          id VARCHAR(100) PRIMARY KEY,
+          matricula VARCHAR(50) UNIQUE NOT NULL,
+          modelo VARCHAR(100) NOT NULL,
+          fabricante VARCHAR(100) NOT NULL,
+          ano INTEGER,
+          horas_totais DOUBLE PRECISION DEFAULT 0,
+          cliente_id VARCHAR(100),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+        );
+        
+        CREATE TABLE IF NOT EXISTS historico_voos (
+          id VARCHAR(100) PRIMARY KEY,
+          aeronave_id VARCHAR(100) NOT NULL,
+          data VARCHAR(20) NOT NULL,
+          horas_voo DOUBLE PRECISION NOT NULL,
+          piloto VARCHAR(255),
+          descricao TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_aeronave_voo FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
+        );
+        
+        CREATE TABLE IF NOT EXISTS componentes (
+          id VARCHAR(100) PRIMARY KEY,
+          aeronave_id VARCHAR(100) NOT NULL,
+          nome VARCHAR(255) NOT NULL,
+          part_number VARCHAR(100),
+          serial_number VARCHAR(100),
+          limite_horas DOUBLE PRECISION DEFAULT 0,
+          limite_dias INTEGER DEFAULT 0,
+          horas_instalacao DOUBLE PRECISION DEFAULT 0,
+          data_instalacao VARCHAR(20),
+          ultima_revisao_horas DOUBLE PRECISION DEFAULT 0,
+          ultima_revisao_data VARCHAR(20),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_aeronave_comp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
+        );
+        
+        CREATE TABLE IF NOT EXISTS revisoes (
+          id VARCHAR(100) PRIMARY KEY,
+          aeronave_id VARCHAR(100) NOT NULL,
+          componente_id VARCHAR(100),
+          data VARCHAR(20) NOT NULL,
+          horas_na_revisao DOUBLE PRECISION NOT NULL,
+          descricao TEXT,
+          tipo VARCHAR(50) DEFAULT 'periodica',
+          nome_anexo VARCHAR(255),
+          dados_anexo TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_aeronave_rev FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE,
+          CONSTRAINT fk_componente_rev FOREIGN KEY (componente_id) REFERENCES componentes(id) ON DELETE SET NULL
+        );
+      `);
+      console.log('Tabelas PostgreSQL inicializadas com sucesso.');
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    dbConnectionError = 'Falha de Conexão com o Banco de Dados PostgreSQL: ' + (err?.message || String(err));
+    console.error(dbConnectionError, err);
   }
-}
-
-function writeLocalDb(data: LocalSchema) {
-  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), 'utf8');
 }
 
 // GERENCIAMENTO DE CLIENTES
 export async function getClientes(): Promise<Cliente[]> {
-  if (!useLocalDb && pool) {
-    const res = await pool.query('SELECT * FROM clientes ORDER BY nome ASC');
+  try {
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM clientes ORDER BY nome ASC');
     return res.rows.map(row => ({
       id: row.id,
       nome: row.nome,
@@ -188,60 +165,56 @@ export async function getClientes(): Promise<Cliente[]> {
       documento: row.documento,
       created_at: row.created_at
     }));
-  } else {
-    return readLocalDb().clientes;
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de clientes: ' + err.message);
+    throw err;
   }
 }
 
 export async function addCliente(cliente: Cliente): Promise<Cliente> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, nome, email, telefone, documento } = cliente;
-    await pool.query(
+    await p.query(
       'INSERT INTO clientes (id, nome, email, telefone, documento) VALUES ($1, $2, $3, $4, $5)',
       [id, nome, email, telefone, documento]
     );
     return cliente;
-  } else {
-    const db = readLocalDb();
-    db.clientes.push(cliente);
-    writeLocalDb(db);
-    return cliente;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar cliente: ' + err.message);
+    throw err;
   }
 }
 
 export async function updateCliente(cliente: Cliente): Promise<Cliente> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, nome, email, telefone, documento } = cliente;
-    await pool.query(
+    await p.query(
       'UPDATE clientes SET nome = $1, email = $2, telefone = $3, documento = $4 WHERE id = $5',
       [nome, email, telefone, documento, id]
     );
     return cliente;
-  } else {
-    const db = readLocalDb();
-    const idx = db.clientes.findIndex(c => c.id === cliente.id);
-    if (idx !== -1) {
-      db.clientes[idx] = { ...db.clientes[idx], ...cliente };
-      writeLocalDb(db);
-    }
-    return cliente;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar cliente: ' + err.message);
+    throw err;
   }
 }
 
 export async function deleteCliente(id: string): Promise<void> {
-  if (!useLocalDb && pool) {
-    await pool.query('DELETE FROM clientes WHERE id = $1', [id]);
-  } else {
-    const db = readLocalDb();
-    db.clientes = db.clientes.filter(c => c.id !== id);
-    db.aeronaves = db.aeronaves.filter(a => a.clienteId !== id);
-    writeLocalDb(db);
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM clientes WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar cliente: ' + err.message);
+    throw err;
   }
 }
 
 // GERENCIAMENTO DE AERONAVES
 export async function getAeronaves(clienteId?: string): Promise<Aeronave[]> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     let query = 'SELECT * FROM aeronaves';
     const params = [];
     if (clienteId) {
@@ -249,7 +222,7 @@ export async function getAeronaves(clienteId?: string): Promise<Aeronave[]> {
       params.push(clienteId);
     }
     query += ' ORDER BY matricula ASC';
-    const res = await pool.query(query, params);
+    const res = await p.query(query, params);
     return res.rows.map(row => ({
       id: row.id,
       matricula: row.matricula,
@@ -260,15 +233,16 @@ export async function getAeronaves(clienteId?: string): Promise<Aeronave[]> {
       clienteId: row.cliente_id,
       created_at: row.created_at
     }));
-  } else {
-    const db = readLocalDb();
-    return clienteId ? db.aeronaves.filter(a => a.clienteId === clienteId) : db.aeronaves;
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de aeronaves: ' + err.message);
+    throw err;
   }
 }
 
 export async function getAeronaveById(id: string): Promise<Aeronave | null> {
-  if (!useLocalDb && pool) {
-    const res = await pool.query('SELECT * FROM aeronaves WHERE id = $1', [id]);
+  try {
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM aeronaves WHERE id = $1', [id]);
     if (res.rows.length === 0) return null;
     const row = res.rows[0];
     return {
@@ -281,63 +255,56 @@ export async function getAeronaveById(id: string): Promise<Aeronave | null> {
       clienteId: row.cliente_id,
       created_at: row.created_at
     };
-  } else {
-    const db = readLocalDb();
-    return db.aeronaves.find(a => a.id === id) || null;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao buscar aeronave por id: ' + err.message);
+    throw err;
   }
 }
 
 export async function addAeronave(aeronave: Aeronave): Promise<Aeronave> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, matricula, modelo, fabricante, ano, horasTotais, clienteId } = aeronave;
-    await pool.query(
+    await p.query(
       'INSERT INTO aeronaves (id, matricula, modelo, fabricante, ano, horas_totais, cliente_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
       [id, matricula, modelo, fabricante, ano, horasTotais, clienteId]
     );
     return aeronave;
-  } else {
-    const db = readLocalDb();
-    db.aeronaves.push(aeronave);
-    writeLocalDb(db);
-    return aeronave;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar aeronave: ' + err.message);
+    throw err;
   }
 }
 
 export async function updateAeronave(aeronave: Aeronave): Promise<Aeronave> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, matricula, modelo, fabricante, ano, horasTotais, clienteId } = aeronave;
-    await pool.query(
+    await p.query(
       'UPDATE aeronaves SET matricula = $1, modelo = $2, fabricante = $3, ano = $4, horas_totais = $5, cliente_id = $6 WHERE id = $7',
       [matricula, modelo, fabricante, ano, horasTotais, clienteId, id]
     );
     return aeronave;
-  } else {
-    const db = readLocalDb();
-    const idx = db.aeronaves.findIndex(a => a.id === aeronave.id);
-    if (idx !== -1) {
-      db.aeronaves[idx] = { ...db.aeronaves[idx], ...aeronave };
-      writeLocalDb(db);
-    }
-    return aeronave;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar aeronave: ' + err.message);
+    throw err;
   }
 }
 
 export async function deleteAeronave(id: string): Promise<void> {
-  if (!useLocalDb && pool) {
-    await pool.query('DELETE FROM aeronaves WHERE id = $1', [id]);
-  } else {
-    const db = readLocalDb();
-    db.aeronaves = db.aeronaves.filter(a => a.id !== id);
-    db.historicoVoos = db.historicoVoos.filter(v => v.aeronaveId !== id);
-    db.componentes = db.componentes.filter(c => c.aeronaveId !== id);
-    db.revisoes = db.revisoes.filter(r => r.aeronaveId !== id);
-    writeLocalDb(db);
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM aeronaves WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar aeronave: ' + err.message);
+    throw err;
   }
 }
 
 // HISTÓRICO DE VOOS
 export async function getHistoricoVoos(aeronaveId?: string): Promise<HistoricoVoo[]> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     let query = 'SELECT * FROM historico_voos';
     const params = [];
     if (aeronaveId) {
@@ -345,7 +312,7 @@ export async function getHistoricoVoos(aeronaveId?: string): Promise<HistoricoVo
       params.push(aeronaveId);
     }
     query += ' ORDER BY data DESC, created_at DESC';
-    const res = await pool.query(query, params);
+    const res = await p.query(query, params);
     return res.rows.map(row => ({
       id: row.id,
       aeronaveId: row.aeronave_id,
@@ -355,76 +322,59 @@ export async function getHistoricoVoos(aeronaveId?: string): Promise<HistoricoVo
       descricao: row.descricao,
       created_at: row.created_at
     }));
-  } else {
-    const db = readLocalDb();
-    const list = aeronaveId ? db.historicoVoos.filter(v => v.aeronaveId === aeronaveId) : db.historicoVoos;
-    return list.sort((a, b) => b.data.localeCompare(a.data));
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de histórico de voos: ' + err.message);
+    throw err;
   }
 }
 
 export async function addVoo(voo: HistoricoVoo): Promise<HistoricoVoo> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, aeronaveId, data, horasVoo, piloto, descricao } = voo;
     
     // Inserir voo
-    await pool.query(
+    await p.query(
       'INSERT INTO historico_voos (id, aeronave_id, data, horas_voo, piloto, descricao) VALUES ($1, $2, $3, $4, $5, $6)',
       [id, aeronaveId, data, horasVoo, piloto, descricao]
     );
     
     // Atualizar horas totais da aeronave
-    await pool.query(
+    await p.query(
       'UPDATE aeronaves SET horas_totais = horas_totais + $1 WHERE id = $2',
       [horasVoo, aeronaveId]
     );
     
     return voo;
-  } else {
-    const db = readLocalDb();
-    db.historicoVoos.push(voo);
-    
-    // Atualiza aeronave
-    const aIdx = db.aeronaves.findIndex(a => a.id === voo.aeronaveId);
-    if (aIdx !== -1) {
-      db.aeronaves[aIdx].horasTotais += voo.horasVoo;
-    }
-    
-    writeLocalDb(db);
-    return voo;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar voo: ' + err.message);
+    throw err;
   }
 }
 
 export async function deleteVoo(id: string): Promise<void> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     // Buscar voo para subtrair as horas
-    const vooRes = await pool.query('SELECT aeronave_id, horas_voo FROM historico_voos WHERE id = $1', [id]);
+    const vooRes = await p.query('SELECT aeronave_id, horas_voo FROM historico_voos WHERE id = $1', [id]);
     if (vooRes.rows.length > 0) {
       const { aeronave_id, horas_voo } = vooRes.rows[0];
-      await pool.query('DELETE FROM historico_voos WHERE id = $1', [id]);
-      await pool.query(
+      await p.query('DELETE FROM historico_voos WHERE id = $1', [id]);
+      await p.query(
         'UPDATE aeronaves SET horas_totais = GREATEST(0, horas_totais - $1) WHERE id = $2',
         [horas_voo, aeronave_id]
       );
     }
-  } else {
-    const db = readLocalDb();
-    const vooIdx = db.historicoVoos.findIndex(v => v.id === id);
-    if (vooIdx !== -1) {
-      const voo = db.historicoVoos[vooIdx];
-      db.historicoVoos.splice(vooIdx, 1);
-      
-      const aIdx = db.aeronaves.findIndex(a => a.id === voo.aeronaveId);
-      if (aIdx !== -1) {
-        db.aeronaves[aIdx].horasTotais = Math.max(0, db.aeronaves[aIdx].horasTotais - voo.horasVoo);
-      }
-      writeLocalDb(db);
-    }
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar voo: ' + err.message);
+    throw err;
   }
 }
 
 // COMPONENTES CONTROLADOS
 export async function getComponentes(aeronaveId?: string): Promise<ComponenteControlado[]> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     let query = 'SELECT * FROM componentes';
     const params = [];
     if (aeronaveId) {
@@ -432,7 +382,7 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       params.push(aeronaveId);
     }
     query += ' ORDER BY nome ASC';
-    const res = await pool.query(query, params);
+    const res = await p.query(query, params);
     return res.rows.map(row => ({
       id: row.id,
       aeronaveId: row.aeronave_id,
@@ -447,62 +397,57 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       ultimaRevisaoData: row.ultima_revisao_data,
       created_at: row.created_at
     }));
-  } else {
-    const db = readLocalDb();
-    return aeronaveId ? db.componentes.filter(c => c.aeronaveId === aeronaveId) : db.componentes;
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de componentes: ' + err.message);
+    throw err;
   }
 }
 
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData } = comp;
-    await pool.query(
+    await p.query(
       `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData]
     );
     return comp;
-  } else {
-    const db = readLocalDb();
-    db.componentes.push(comp);
-    writeLocalDb(db);
-    return comp;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar componente: ' + err.message);
+    throw err;
   }
 }
 
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData } = comp;
-    await pool.query(
+    await p.query(
       `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10 WHERE id = $11`,
       [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, id]
     );
     return comp;
-  } else {
-    const db = readLocalDb();
-    const idx = db.componentes.findIndex(c => c.id === comp.id);
-    if (idx !== -1) {
-      db.componentes[idx] = { ...db.componentes[idx], ...comp };
-      writeLocalDb(db);
-    }
-    return comp;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar componente: ' + err.message);
+    throw err;
   }
 }
 
 export async function deleteComponente(id: string): Promise<void> {
-  if (!useLocalDb && pool) {
-    await pool.query('DELETE FROM componentes WHERE id = $1', [id]);
-  } else {
-    const db = readLocalDb();
-    db.componentes = db.componentes.filter(c => c.id !== id);
-    db.revisoes = db.revisoes.map(r => r.componenteId === id ? { ...r, componenteId: undefined } : r);
-    writeLocalDb(db);
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM componentes WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar componente: ' + err.message);
+    throw err;
   }
 }
 
 // LAUDOS E REVISÕES
 export async function getRevisoes(aeronaveId?: string): Promise<RevisaoLaudo[]> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     let query = 'SELECT * FROM revisoes';
     const params = [];
     if (aeronaveId) {
@@ -510,7 +455,7 @@ export async function getRevisoes(aeronaveId?: string): Promise<RevisaoLaudo[]> 
       params.push(aeronaveId);
     }
     query += ' ORDER BY data DESC, created_at DESC';
-    const res = await pool.query(query, params);
+    const res = await p.query(query, params);
     return res.rows.map(row => ({
       id: row.id,
       aeronaveId: row.aeronave_id,
@@ -523,17 +468,17 @@ export async function getRevisoes(aeronaveId?: string): Promise<RevisaoLaudo[]> 
       dadosAnexo: row.dados_anexo || undefined,
       created_at: row.created_at
     }));
-  } else {
-    const db = readLocalDb();
-    const list = aeronaveId ? db.revisoes.filter(r => r.aeronaveId === aeronaveId) : db.revisoes;
-    return list.sort((a, b) => b.data.localeCompare(a.data));
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de revisões: ' + err.message);
+    throw err;
   }
 }
 
 export async function addRevisao(rev: RevisaoLaudo): Promise<RevisaoLaudo> {
-  if (!useLocalDb && pool) {
+  try {
+    const p = checkPool();
     const { id, aeronaveId, componenteId, data, horasNaRevisao, descricao, tipo, nomeAnexo, dadosAnexo } = rev;
-    await pool.query(
+    await p.query(
       `INSERT INTO revisoes (id, aeronave_id, componente_id, data, horas_na_revisao, descricao, tipo, nome_anexo, dados_anexo)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [id, aeronaveId, componenteId || null, data, horasNaRevisao, descricao, tipo, nomeAnexo || null, dadosAnexo || null]
@@ -541,37 +486,25 @@ export async function addRevisao(rev: RevisaoLaudo): Promise<RevisaoLaudo> {
 
     // Se a revisão foi em um componente específico, atualiza suas datas de última revisão
     if (componenteId) {
-      await pool.query(
+      await p.query(
         `UPDATE componentes SET ultima_revisao_horas = $1, ultima_revisao_data = $2 WHERE id = $3`,
         [horasNaRevisao, data, componenteId]
       );
     }
     
     return rev;
-  } else {
-    const db = readLocalDb();
-    db.revisoes.push(rev);
-    
-    // Se for em componente, atualiza o componente
-    if (rev.componenteId) {
-      const cIdx = db.componentes.findIndex(c => c.id === rev.componenteId);
-      if (cIdx !== -1) {
-        db.componentes[cIdx].ultimaRevisaoHoras = rev.horasNaRevisao;
-        db.componentes[cIdx].ultimaRevisaoData = rev.data;
-      }
-    }
-    
-    writeLocalDb(db);
-    return rev;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar revisão: ' + err.message);
+    throw err;
   }
 }
 
 export async function deleteRevisao(id: string): Promise<void> {
-  if (!useLocalDb && pool) {
-    await pool.query('DELETE FROM revisoes WHERE id = $1', [id]);
-  } else {
-    const db = readLocalDb();
-    db.revisoes = db.revisoes.filter(r => r.id !== id);
-    writeLocalDb(db);
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM revisoes WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar revisão: ' + err.message);
+    throw err;
   }
 }

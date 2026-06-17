@@ -26,33 +26,53 @@ export default function App() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedAeronave, setSelectedAeronave] = useState<Aeronave | null>(null);
   
-  const [dbStatus, setDbStatus] = useState({ connected: false, usingLocal: true });
+  const [dbStatus, setDbStatus] = useState<{ connected: boolean; error: string | null }>({
+    connected: true, // Começa assumindo conectado para evitar flicker visual no carregamento
+    error: null
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // --- BUSCAR DADOS DO BACKEND ---
   const fetchBasics = async () => {
     setIsRefreshing(true);
     try {
-      const [cliRes, aeroRes, healthRes] = await Promise.all([
+      // 1. Primeiro verifica o health-check e conexão com o banco
+      const healthRes = await fetch('/api/health');
+      if (!healthRes.ok) {
+        throw new Error(`O servidor respondeu com status ${healthRes.status}`);
+      }
+      
+      const healthData = await healthRes.json();
+      const dbInfo = healthData.database || { connected: false, error: 'Sem informações do banco do servidor.' };
+      
+      if (!dbInfo.connected) {
+        setDbStatus({ connected: false, error: dbInfo.error || 'Erro desconhecido ao conectar ao PostgreSQL' });
+        setIsRefreshing(false);
+        return;
+      }
+
+      // 2. Se a conexão estiver ativa, faz a sincronização dos dados
+      const [cliRes, aeroRes] = await Promise.all([
         fetch('/api/clientes'),
-        fetch('/api/aeronaves'),
-        fetch('/api/health')
+        fetch('/api/aeronaves')
       ]);
 
-      if (cliRes.ok) {
-        setClientes(await cliRes.json());
+      if (!cliRes.ok || !aeroRes.ok) {
+        throw new Error('Falha ao responder com os dados primários de produção.');
       }
-      if (aeroRes.ok) {
-        const aeroList = await aeroRes.json();
-        setAeronaves(aeroList);
-      }
-      if (healthRes.ok) {
-        const data = await healthRes.json();
-        // O status nos indica se o backend está ativo e respondendo
-        setDbStatus({ connected: true, usingLocal: true });
-      }
-    } catch (e) {
-      console.error('Falha ao sincronizar dados com o servidor local:', e);
+
+      const clientList = await cliRes.json();
+      const aeroList = await aeroRes.json();
+
+      setClientes(clientList);
+      setAeronaves(aeroList);
+      setDbStatus({ connected: true, error: null });
+    } catch (e: any) {
+      console.error('Falha ao sincronizar dados com o servidor:', e);
+      setDbStatus({
+        connected: false,
+        error: e?.message || 'Erro de rede ao conectar à API.'
+      });
     } finally {
       setIsRefreshing(false);
     }
@@ -178,6 +198,89 @@ export default function App() {
     }
   };
 
+  if (!dbStatus.connected) {
+    return (
+      <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
+        {/* Glow Effects */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-[250px] h-[250px] bg-sky-500/5 rounded-full blur-[80px] pointer-events-none" />
+
+        <div className="my-auto max-w-xl w-full text-center space-y-8 relative z-10">
+          <div className="flex flex-col items-center">
+            {/* Animated Red Alert Core */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute h-24 w-24 bg-red-500/20 rounded-full animate-ping pointer-events-none" />
+              <div className="h-20 w-20 bg-gradient-to-br from-red-600 to-rose-700 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-red-950/50 border border-red-500/20">
+                <Database className="w-10 h-10 text-white" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-8 w-8 bg-slate-900 border border-slate-950 rounded-full flex items-center justify-center text-red-500 shadow-md">
+                <ShieldAlert className="w-4 h-4 animate-bounce" />
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2">
+              <span className="text-red-400 text-xs font-bold uppercase tracking-widest bg-red-950/50 border border-red-900/40 px-3 py-1 rounded-full">
+                Erro de Conexão Crítico
+              </span>
+              <h2 className="font-display font-extrabold text-white text-2xl sm:text-3xl tracking-tight leading-tight">
+                Falha ao conectar com o PostgreSQL
+              </h2>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/85 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 text-left space-y-4 shadow-xl">
+            <p className="text-slate-300 text-sm leading-relaxed">
+              O aplicativo <strong className="text-white">AeroManut</strong> está configurado em modo estrito de produção para VPS. O sistema requer uma conexão ativa com o banco de dados PostgreSQL antes de inicializar o painel, não sendo permitido conexões ou armazenamentos locais temporários.
+            </p>
+
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Detalhes do Erro Técnico:
+              </span>
+              <div className="bg-slate-950 border border-red-950/50 text-red-400 font-mono text-xs rounded-xl p-4 whitespace-pre-wrap select-all shadow-inner max-h-48 overflow-y-auto leading-relaxed">
+                {dbStatus.error || 'Nenhum detalhe adicional de erro retornado pelo servidor.'}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+                <Server className="w-3 h-3 text-sky-400" />
+                Dicas de Solução para VPS / Coolify:
+              </span>
+              <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-normal">
+                <li>Defina a variável <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">DATABASE_URL</code> com uma URL de conexão válida.</li>
+                <li>Ou configure separadamente as variáveis: <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded flex-wrap">PGHOST</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGUSER</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGPASSWORD</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGDATABASE</code> e <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGPORT</code>.</li>
+                <li>Verifique se o container ou serviço do PostgreSQL está rodando e acessível na mesma rede privada do Coolify/VPS.</li>
+              </ul>
+            </div>
+          </div>
+
+          <button
+            onClick={fetchBasics}
+            disabled={isRefreshing}
+            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 text-white font-bold text-sm px-6 py-4 rounded-xl cursor-pointer shadow-lg shadow-sky-500/10 hover:shadow-sky-500/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {isRefreshing ? (
+              <>
+                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Tentando Reconectar...
+              </>
+            ) : (
+              <>
+                <Database className="w-4 h-4" />
+                Verificar Conexão Novamente
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="w-full text-center text-[10px] text-slate-600 mt-8">
+          AeroManut • Modo Estrito de Produção • VPS Engine
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col font-sans" id="main-app">
       {/* Navbar Superior do Sistema */}
@@ -193,17 +296,6 @@ export default function App() {
               </h1>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Controle de Manutenção Aeronáutica</p>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-xl text-slate-300">
-              <Server className="w-3.5 h-3.5 text-sky-400" />
-              VPS: <strong className="text-white font-semibold">Coolify Postgres-Ready</strong>
-            </span>
-            <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 block animate-pulse"></span>
-              Servidor Conectado
-            </span>
           </div>
         </div>
       </header>
@@ -282,24 +374,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Rodapé explicativo de VPS e Coolify PostgreSQL */}
-      <footer className="bg-slate-950/75 border-t border-slate-900 mt-12 py-8 px-6 text-xs text-center" id="app-footer">
-        <div className="max-w-7xl mx-auto space-y-4">
-          <div className="flex items-center justify-center gap-2 text-sky-400">
-            <Database className="w-4 h-4" />
-            <h5 className="font-display font-bold tracking-wider uppercase text-[10px]">Configuração Pronta para Produção no Coolify</h5>
-          </div>
-          <p className="max-w-xl mx-auto leading-relaxed text-slate-400 text-[11px]">
-            Este aplicativo está equipado com um adaptador híbrido. No ambiente AI Studio Preview, ele salva os dados no arquivo local 
-            <code className="bg-slate-900 text-sky-400 font-semibold px-1.5 py-0.5 rounded ml-1 font-mono">database-local.json</code> para visualização imediata. 
-            Ao enviar para a VPS com Coolify, basta configurar a variável de ambiente:
-          </p>
-          <div className="bg-slate-900 border border-slate-800 text-sky-400 px-4 py-2.5 rounded-xl font-mono text-[11px] w-fit mx-auto select-all shadow-inner">
-            DATABASE_URL="postgresql://usuario:senha@seu-postgres-coolify:5432/nomedobanco"
-          </div>
-          <p className="text-[10px] text-slate-500">
-            A infraestrutura criará as tabelas de Clientes, Aeronaves, Componentes, Voos e Revisões automaticamente de forma nativa.
-          </p>
+      {/* Rodapé do Sistema */}
+      <footer className="bg-slate-950/75 border-t border-slate-900 mt-12 py-6 px-6 text-xs text-center text-slate-500" id="app-footer">
+        <div className="max-w-7xl mx-auto">
+          <p>© {new Date().getFullYear()} AeroManut - Sistema de Controle de Manutenção Aeronáutica.</p>
         </div>
       </footer>
     </div>

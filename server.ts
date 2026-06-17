@@ -21,7 +21,8 @@ import {
   deleteComponente,
   getRevisoes,
   addRevisao,
-  deleteRevisao
+  deleteRevisao,
+  getDbConnectionStatus
 } from './src/server/db.js';
 
 async function startServer() {
@@ -39,7 +40,12 @@ async function startServer() {
 
   // Health check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    const dbStatus = getDbConnectionStatus();
+    res.json({
+      status: 'ok',
+      time: new Date().toISOString(),
+      database: dbStatus
+    });
   });
 
   // --- CLIENTES ---

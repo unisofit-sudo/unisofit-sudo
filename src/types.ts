@@ -9,6 +9,10 @@ export interface Cliente {
   email: string;
   telefone: string;
   documento: string; // CPF / CNPJ
+  endereco?: string;
+  whatsapp?: string;
+  tipoPessoa?: 'PF' | 'PJ';
+  senha?: string;
   created_at?: string;
 }
 

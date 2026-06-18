@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Cliente } from '../types';
-import { User, Phone, Mail, FileText, Search, Plus, Trash2, Edit2, Users } from 'lucide-react';
+import { User, Phone, Mail, FileText, Search, Plus, Trash2, Edit2, Users, MapPin, MessageSquare, Lock } from 'lucide-react';
 
 interface ClientesListProps {
   clientes: Cliente[];
@@ -35,6 +35,10 @@ export default function ClientesList({
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
   const [documento, setDocumento] = useState('');
+  const [endereco, setEndereco] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [tipoPessoa, setTipoPessoa] = useState<'PF' | 'PJ'>('PF');
+  const [senha, setSenha] = useState('');
 
   const filteredClientes = clientes.filter(c => 
     c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -52,14 +56,22 @@ export default function ClientesList({
         nome,
         email,
         telefone,
-        documento
+        documento,
+        endereco,
+        whatsapp,
+        tipoPessoa,
+        senha
       });
     } else {
       await onAddCliente({
         nome,
         email,
         telefone,
-        documento
+        documento,
+        endereco,
+        whatsapp,
+        tipoPessoa,
+        senha
       });
     }
 
@@ -70,6 +82,10 @@ export default function ClientesList({
     setEmail('');
     setTelefone('');
     setDocumento('');
+    setEndereco('');
+    setWhatsapp('');
+    setTipoPessoa('PF');
+    setSenha('');
   };
 
   const handleEdit = (c: Cliente, e: React.MouseEvent) => {
@@ -79,6 +95,10 @@ export default function ClientesList({
     setEmail(c.email);
     setTelefone(c.telefone);
     setDocumento(c.documento);
+    setEndereco(c.endereco || '');
+    setWhatsapp(c.whatsapp || '');
+    setTipoPessoa(c.tipoPessoa || 'PF');
+    setSenha(c.senha || '');
     setIsFormOpen(true);
   };
 
@@ -95,6 +115,10 @@ export default function ClientesList({
     setEmail('');
     setTelefone('');
     setDocumento('');
+    setEndereco('');
+    setWhatsapp('');
+    setTipoPessoa('PF');
+    setSenha('');
     setIsFormOpen(true);
   };
 
@@ -163,19 +187,48 @@ export default function ClientesList({
                   </div>
                   
                   {/* Dados de contato */}
-                  <div className="mt-2 space-y-0.5 text-[11px] text-slate-400">
-                    <div className="flex items-center gap-1.5">
+                  <div className="mt-2 space-y-1 text-[11px] text-slate-400">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <Mail className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
                       <span className="truncate">{c.email || 'Sem e-mail'}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                      <span>{c.telefone || 'Sem telefone'}</span>
+                    
+                    <div className="flex flex-wrap gap-x-2 gap-y-1 items-center">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-slate-800 text-sky-400 border border-slate-700/50">
+                          {c.tipoPessoa || 'PF'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono">{c.documento || 'Sem doc.'}</span>
+                      </div>
+                      
+                      {c.telefone && (
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                          <Phone className="w-3 h-3 text-slate-600" />
+                          <span>{c.telefone}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                      <span>Doc: {c.documento || 'ND'}</span>
-                    </div>
+
+                    {c.whatsapp && (
+                      <div className="flex items-center gap-1.5 text-emerald-400/90 font-medium">
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-500/80 flex-shrink-0" />
+                        <span>Whats: {c.whatsapp}</span>
+                      </div>
+                    )}
+
+                    {c.endereco && (
+                      <div className="flex items-center gap-1.5 text-slate-400/80 min-w-0">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                        <span className="truncate" title={c.endereco}>{c.endereco}</span>
+                      </div>
+                    )}
+
+                    {c.senha && (
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500/80">
+                        <Lock className="w-3 h-3 text-slate-600 flex-shrink-0" />
+                        <span className="italic">Senha configurada</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -220,7 +273,7 @@ export default function ClientesList({
             
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Nome Completo *</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Nome Completo *</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -229,24 +282,41 @@ export default function ClientesList({
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     placeholder="Ex: João da Silva Air"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500 font-medium"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500 font-medium font-sans"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">CPF ou CNPJ</label>
-                  <input
-                    type="text"
-                    value={documento}
-                    onChange={(e) => setDocumento(e.target.value)}
-                    placeholder="Ex: 000.000.000-00"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Tipo de Pessoa *</label>
+                  <select
+                    value={tipoPessoa}
+                    onChange={(e) => setTipoPessoa(e.target.value as 'PF' | 'PJ')}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200"
+                  >
+                    <option value="PF">Pessoa Física (PF)</option>
+                    <option value="PJ">Pessoa Jurídica (PJ)</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Telefone</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    {tipoPessoa === 'PF' ? 'CPF *' : 'CNPJ *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={documento}
+                    onChange={(e) => setDocumento(e.target.value)}
+                    placeholder={tipoPessoa === 'PF' ? "Ex: 000.000.000-00" : "Ex: 00.000.000/0001-00"}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Telefone</label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
@@ -258,19 +328,63 @@ export default function ClientesList({
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1 font-sans">WhatsApp</label>
+                  <div className="relative">
+                    <MessageSquare className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      placeholder="Ex: (11) 99999-9999"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">E-mail</label>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Endereço Completo</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <MapPin className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Ex: contato@cliente.com"
+                    type="text"
+                    value={endereco}
+                    onChange={(e) => setEndereco(e.target.value)}
+                    placeholder="Ex: Av. Paulistania, 1200 - Bloco B"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail (Login) *</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Ex: contato@cliente.com"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Criar Senha de Acesso *</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -284,7 +398,7 @@ export default function ClientesList({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 text-xs font-medium text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-500/10"
+                  className="px-4 py-2.5 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-500/10"
                 >
                   {editingCliente ? 'Salvar Alterações' : 'Cadastrar Cliente'}
                 </button>

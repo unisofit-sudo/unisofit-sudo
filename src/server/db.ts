@@ -165,8 +165,18 @@ export async function initDb() {
           email VARCHAR(255),
           telefone VARCHAR(50),
           documento VARCHAR(50),
+          endereco TEXT,
+          whatsapp VARCHAR(50),
+          tipo_pessoa VARCHAR(20) DEFAULT 'PF',
+          senha VARCHAR(255),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- Garante suporte a evolução do schema caso a tabela já exista
+        ALTER TABLE clientes ADD COLUMN IF NOT EXISTS endereco TEXT;
+        ALTER TABLE clientes ADD COLUMN IF NOT EXISTS whatsapp VARCHAR(50);
+        ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tipo_pessoa VARCHAR(20) DEFAULT 'PF';
+        ALTER TABLE clientes ADD COLUMN IF NOT EXISTS senha VARCHAR(255);
         
         CREATE TABLE IF NOT EXISTS aeronaves (
           id VARCHAR(100) PRIMARY KEY,
@@ -244,6 +254,10 @@ export async function getClientes(): Promise<Cliente[]> {
       email: row.email,
       telefone: row.telefone,
       documento: row.documento,
+      endereco: row.endereco || '',
+      whatsapp: row.whatsapp || '',
+      tipoPessoa: (row.tipo_pessoa || 'PF') as 'PF' | 'PJ',
+      senha: row.senha || '',
       created_at: row.created_at
     }));
   } catch (err: any) {
@@ -255,10 +269,10 @@ export async function getClientes(): Promise<Cliente[]> {
 export async function addCliente(cliente: Cliente): Promise<Cliente> {
   try {
     const p = checkPool();
-    const { id, nome, email, telefone, documento } = cliente;
+    const { id, nome, email, telefone, documento, endereco, whatsapp, tipoPessoa, senha } = cliente;
     await p.query(
-      'INSERT INTO clientes (id, nome, email, telefone, documento) VALUES ($1, $2, $3, $4, $5)',
-      [id, nome, email, telefone, documento]
+      'INSERT INTO clientes (id, nome, email, telefone, documento, endereco, whatsapp, tipo_pessoa, senha) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [id, nome, email, telefone, documento, endereco || '', whatsapp || '', tipoPessoa || 'PF', senha || '']
     );
     return cliente;
   } catch (err: any) {
@@ -270,10 +284,10 @@ export async function addCliente(cliente: Cliente): Promise<Cliente> {
 export async function updateCliente(cliente: Cliente): Promise<Cliente> {
   try {
     const p = checkPool();
-    const { id, nome, email, telefone, documento } = cliente;
+    const { id, nome, email, telefone, documento, endereco, whatsapp, tipoPessoa, senha } = cliente;
     await p.query(
-      'UPDATE clientes SET nome = $1, email = $2, telefone = $3, documento = $4 WHERE id = $5',
-      [nome, email, telefone, documento, id]
+      'UPDATE clientes SET nome = $1, email = $2, telefone = $3, documento = $4, endereco = $5, whatsapp = $6, tipo_pessoa = $7, senha = $8 WHERE id = $9',
+      [nome, email, telefone, documento, endereco || '', whatsapp || '', tipoPessoa || 'PF', senha || '', id]
     );
     return cliente;
   } catch (err: any) {

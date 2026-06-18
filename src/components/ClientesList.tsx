@@ -257,18 +257,18 @@ export default function ClientesList({
 
       {/* Modal/Formulário para Criar/Editar */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="cliente-modal">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden transform transition-all">
-            <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center">
-              <h3 className="font-display font-semibold text-sm">
-                {editingCliente ? 'Editar Cliente' : 'Novo Cliente'}
-              </h3>
-              <button
-                onClick={() => setIsFormOpen(false)}
-                className="text-slate-400 hover:text-white font-medium text-xs rounded-full p-1 cursor-pointer transition-colors"
-              >
-                ✕
-              </button>
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10 animate-fade-in" id="cliente-modal">
+          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden flex flex-col my-auto transform transition-all">
+            <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
+               <h3 className="font-display font-semibold text-sm">
+                 {editingCliente ? 'Editar Cliente' : 'Novo Cliente'}
+               </h3>
+               <button
+                 onClick={() => setIsFormOpen(false)}
+                 className="text-slate-400 hover:text-white font-medium text-xs rounded-full p-1 cursor-pointer transition-colors"
+               >
+                 ✕
+               </button>
             </div>
             
             <form onSubmit={handleSubmit} className="p-5 space-y-4">

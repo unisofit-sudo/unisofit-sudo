@@ -209,15 +209,15 @@ export default function AeronavesList({
 
       {/* Modal para Adicionar/Editar Aeronave */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="aeronave-modal">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden">
-            <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10 animate-fade-in" id="aeronave-modal">
+          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden flex flex-col my-auto">
+            <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
               <h3 className="font-display font-semibold text-sm">
                 {editingAeronave ? 'Editar Aeronave' : 'Nova Aeronave'}
               </h3>
               <button
                 onClick={() => setIsFormOpen(false)}
-                className="text-slate-400 hover:text-white transition-colors text-xs"
+                className="text-slate-405 hover:text-white transition-colors text-xs p-1"
               >
                 ✕
               </button>

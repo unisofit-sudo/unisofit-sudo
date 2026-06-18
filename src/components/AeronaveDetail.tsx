@@ -297,68 +297,75 @@ export default function AeronaveDetail({
   return (
     <div className="space-y-6" id={`aeronave-workspace-${aeronave.matricula}`}>
       {/* Visual principal da aeronave */}
-      <div className="bg-slate-800/40 rounded-2xl p-6 border border-slate-700/50 shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-405 border border-emerald-500/20 px-2.5 py-0.5 rounded-full inline-block">
-              AERONAVE ATIVA
-            </span>
-            <span className="text-[11px] text-slate-400">Proprietário: <strong className="text-slate-200">{cliente.nome}</strong></span>
+      <div className="bg-slate-800/40 rounded-2xl p-6 border border-slate-700/50 shadow-xl overflow-hidden flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 w-full">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full inline-block">
+                AERONAVE ATIVA
+              </span>
+              <span className="text-[11px] text-slate-400">Proprietário: <strong className="text-slate-200">{cliente.nome}</strong></span>
+            </div>
+            <h1 className="text-3xl font-display font-extrabold text-white tracking-tight flex flex-wrap items-center gap-2">
+              {aeronave.matricula}
+              <span className="text-xs font-semibold text-slate-300 px-3 py-1 bg-slate-700/50 rounded-full border border-slate-600/30">
+                {aeronave.fabricante} {aeronave.modelo}
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400 flex items-center gap-3 font-mono">
+              <span>Fabricação: <strong className="text-slate-300">{aeronave.ano}</strong></span>
+              <span className="text-slate-600">•</span>
+              <span>ID Interno: <strong className="text-slate-300">{aeronave.id}</strong></span>
+            </p>
           </div>
-          <h1 className="text-3xl font-display font-extrabold text-white tracking-tight flex items-center gap-2">
-            {aeronave.matricula}
-            <span className="text-xs font-semibold text-slate-300 px-3 py-1 bg-slate-700/50 rounded-full border border-slate-600/30">
-              {aeronave.fabricante} {aeronave.modelo}
-            </span>
-          </h1>
-          <p className="text-xs text-slate-400 flex items-center gap-3 font-mono">
-            <span>Fabricação: <strong className="text-slate-300">{aeronave.ano}</strong></span>
-            <span className="text-slate-600">•</span>
-            <span>ID Interno: <strong className="text-slate-300">{aeronave.id}</strong></span>
-          </p>
-        </div>
-        
-        <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-705/30 w-full md:w-auto flex items-center md:items-start gap-4">
-          <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20">
-            <Gauge className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Horas Totais de Voo</p>
-            <p className="text-2xl font-black text-sky-450">{aeronave.horasTotais.toFixed(1)} <span className="text-xs font-normal text-slate-400">hs</span></p>
-            <span className="text-[9px] text-slate-500 block">Tempo em Serviço (T.S.N.)</span>
+          
+          <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/30 w-full md:w-auto flex items-center lg:items-start gap-4 flex-shrink-0">
+            <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20">
+              <Gauge className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Horas Totais de Voo</p>
+              <p className="text-2xl font-black text-sky-400">{aeronave.horasTotais.toFixed(1)} <span className="text-xs font-normal text-slate-400">hs</span></p>
+              <span className="text-[9px] text-slate-500 block">Tempo em Serviço (T.S.N.)</span>
+            </div>
           </div>
         </div>
 
-        {/* Contador de Alertas Rápidos */}
-        <div className="w-full md:absolute md:bottom-3 md:right-3 flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider mt-2 md:mt-0">
+        {/* Linha divisória discreta */}
+        <div className="h-px bg-slate-700/20 w-full" />
+
+        {/* Contador de Alertas Rápidos - Sem absolute para evitar escritos sobrepostos */}
+        <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider">
           <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
             <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
             <span>Componentes Monitorados: <strong>{componentes.length}</strong></span>
           </div>
 
-          <div
+          <button
+            type="button"
             onClick={() => { setActiveTab('mapa'); setAlertFilter('critico'); }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
               countCriticos > 0 
-                ? 'bg-red-500/15 border-red-500/30 text-red-300 animate-pulse' 
-                : 'bg-slate-900/30 border-slate-700/30 text-slate-400'
+                ? 'bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25 animate-pulse' 
+                : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${countCriticos > 0 ? 'bg-red-500' : 'bg-slate-600'}`}></span>
             <span>Vencidos / Críticos: <strong>{countCriticos}</strong></span>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             onClick={() => { setActiveTab('mapa'); setAlertFilter('atencao'); }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
               countAtencao > 0 
-                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' 
-                : 'bg-slate-900/30 border-slate-700/30 text-slate-400'
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25' 
+                : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${countAtencao > 0 ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
             <span>Alerta de Atenção: <strong>{countAtencao}</strong></span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -708,15 +715,15 @@ export default function AeronaveDetail({
 
             {/* Modal de Cadastro de Componente */}
             {isCompFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center">
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
+                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden flex flex-col my-auto select-none">
+                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
                     <h3 className="font-display font-semibold text-sm">
                       {compEditing ? 'Editar Componente' : 'Novo Componente Controlado'}
                     </h3>
                     <button
                       onClick={() => setIsCompFormOpen(false)}
-                      className="text-slate-405 hover:text-white transition-colors text-xs"
+                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
                     >
                       ✕
                     </button>
@@ -926,13 +933,13 @@ export default function AeronaveDetail({
 
             {/* Modal para Adicionar Voo */}
             {isVooFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center">
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
+                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden flex flex-col my-auto">
+                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
                     <h3 className="font-display font-semibold text-sm">Registrar Registro de Voo</h3>
                     <button
                       onClick={() => setIsVooFormOpen(false)}
-                      className="text-slate-405 hover:text-white transition-colors text-xs"
+                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
                     >
                       ✕
                     </button>
@@ -1106,13 +1113,13 @@ export default function AeronaveDetail({
 
             {/* Modal de Cadastrar Revisão ou Laudo */}
             {isRevFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center">
+              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
+                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden flex flex-col my-auto">
+                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
                     <h3 className="font-display font-semibold text-sm">Registrar Revisão e Anexar Laudo Físico</h3>
                     <button
                       onClick={() => setIsRevFormOpen(false)}
-                      className="text-slate-405 hover:text-white transition-colors text-xs"
+                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
                     >
                       ✕
                     </button>

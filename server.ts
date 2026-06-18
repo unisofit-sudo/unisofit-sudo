@@ -64,6 +64,50 @@ async function startServer() {
     }
   });
 
+  // Login da aplicação
+  app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios.' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    // 1. Verifica se é administrador
+    if (cleanEmail === 'lucastrombeta@gmail.com' && password === 'admin123') {
+      return res.json({
+        success: true,
+        role: 'admin',
+        user: {
+          id: 'admin',
+          nome: 'Lucas Trombeta (Admin)',
+          email: 'lucastrombeta@gmail.com',
+          documento: 'Administrador'
+        }
+      });
+    }
+
+    // 2. Busca na base de clientes
+    try {
+      const clientes = await getClientes();
+      const matchedClient = clientes.find(
+        c => c.email.trim().toLowerCase() === cleanEmail && (c.senha || '') === password
+      );
+
+      if (matchedClient) {
+        return res.json({
+          success: true,
+          role: 'cliente',
+          user: matchedClient
+        });
+      }
+
+      res.status(401).json({ success: false, error: 'E-mail ou senha inválidos.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: 'Erro ao autenticar usuário no banco de dados. Verifique a conexão com o banco.' });
+    }
+  });
+
   // --- CLIENTES ---
   app.get('/api/clientes', async (req, res) => {
     try {

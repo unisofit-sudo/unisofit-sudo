@@ -17,7 +17,12 @@ import {
   Wrench, 
   Gauge, 
   ArrowLeft,
-  Server
+  Server,
+  Lock,
+  LogOut,
+  User,
+  Key,
+  Compass
 } from 'lucide-react';
 
 export default function App() {
@@ -26,6 +31,19 @@ export default function App() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedAeronave, setSelectedAeronave] = useState<Aeronave | null>(null);
   
+  // Controle de Autenticação
+  const [userRole, setUserRole] = useState<'admin' | 'cliente' | null>(() => {
+    return (localStorage.getItem('aeromanut_userRole') as 'admin' | 'cliente' | null) || null;
+  });
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    const saved = localStorage.getItem('aeromanut_currentUser');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [dbStatus, setDbStatus] = useState<{ connected: boolean; error: string | null }>({
     connected: true, // Começa assumindo conectado para evitar flicker visual no carregamento
     error: null
@@ -42,6 +60,63 @@ export default function App() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
   const [showConfigForm, setShowConfigForm] = useState(false);
+
+  // Efeito para garantir que o cliente logado esteja sempre pré-selecionado
+  useEffect(() => {
+    if (userRole === 'cliente' && currentUser) {
+      setSelectedCliente(currentUser);
+    }
+  }, [userRole, currentUser]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setLoginError('Por favor, digite seu e-mail e senha.');
+      return;
+    }
+    setIsLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUserRole(data.role);
+        setCurrentUser(data.user);
+        localStorage.setItem('aeromanut_userRole', data.role);
+        localStorage.setItem('aeromanut_currentUser', JSON.stringify(data.user));
+        
+        if (data.role === 'cliente') {
+          setSelectedCliente(data.user);
+        } else {
+          setSelectedCliente(null);
+        }
+        setSelectedAeronave(null);
+      } else {
+        setLoginError(data.error || 'E-mail ou senha incorretos.');
+      }
+    } catch (err) {
+      setLoginError('Falha ao conectar com o servidor. Verifique a rede.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setUserRole(null);
+    setCurrentUser(null);
+    setSelectedCliente(null);
+    setSelectedAeronave(null);
+    localStorage.removeItem('aeromanut_userRole');
+    localStorage.removeItem('aeromanut_currentUser');
+    setLoginEmail('');
+    setLoginPassword('');
+    setLoginError(null);
+  };
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +210,20 @@ export default function App() {
 
       setClientes(clientList);
       setAeronaves(aeroList);
+
+      // Se for cliente, sincroniza as informações atualizadas do próprio perfil do banco de dados
+      const cachedRole = localStorage.getItem('aeromanut_userRole');
+      const cachedUser = localStorage.getItem('aeromanut_currentUser');
+      if (cachedRole === 'cliente' && cachedUser) {
+        const uObj = JSON.parse(cachedUser);
+        const latestInfo = clientList.find((c: any) => c.id === uObj.id);
+        if (latestInfo) {
+          setCurrentUser(latestInfo);
+          setSelectedCliente(latestInfo);
+          localStorage.setItem('aeromanut_currentUser', JSON.stringify(latestInfo));
+        }
+      }
+
       setDbStatus({ connected: true, error: null });
     } catch (e: any) {
       console.error('Falha ao sincronizar dados com o servidor:', e);
@@ -266,6 +355,113 @@ export default function App() {
       console.error(e);
     }
   };
+
+  // Se não estiver autenticado, renderiza a tela de login primeiro
+  if (!userRole) {
+    return (
+      <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
+        {/* Glow Effects */}
+        <div className="absolute top-1/4 left-1/3 -translate-y-1/2 w-[450px] h-[450px] bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/3 w-[350px] h-[350px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="my-auto max-w-md w-full text-center space-y-6 relative z-10">
+          <div className="flex flex-col items-center">
+            <div className="h-16 w-16 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-sky-500/15 mb-4 border border-sky-400/20">
+              <Plane className="w-8 h-8 rotate-45" />
+            </div>
+            <h1 className="font-display font-extrabold text-white tracking-tight text-3xl">
+              AERO<span className="text-sky-400">MANUT</span>
+            </h1>
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-1.5">Controle de Manutenção Aeronáutica</p>
+          </div>
+
+          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 text-left space-y-5 shadow-2xl">
+            <div className="border-b border-slate-800/60 pb-3">
+              <h2 className="font-display font-bold text-white text-lg">Área de Acesso</h2>
+              <p className="text-xs text-slate-400 mt-1">Insira suas credenciais para gerenciar a frota</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">E-mail (Login)</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="Ex: seuemail@provedor.com"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-600"
+                    disabled={isLoggingIn}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">Senha</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Sua senha de acesso"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-600"
+                    disabled={isLoggingIn}
+                  />
+                </div>
+              </div>
+
+              {loginError && (
+                <div className="bg-red-950/40 border border-red-900/50 rounded-xl p-3 text-[11px] text-red-400 flex items-start gap-2 leading-relaxed">
+                  <ShieldAlert className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-3 px-4 bg-sky-500 hover:bg-sky-605 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-sky-500/10 active:scale-[0.98]"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Autenticando...
+                  </>
+                ) : (
+                  'Entrar no Painel'
+                )}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block font-sans">Dicas de Acesso Rápido:</span>
+              <div className="bg-slate-950/70 border border-slate-850 rounded-xl p-3 text-[11px] text-slate-400 space-y-1.5 font-mono">
+                <div>
+                  <span className="text-sky-400 font-semibold block">Acesso Administrador:</span>
+                  <div className="text-[10px] text-slate-350 mt-0.5">E-mail: <span className="text-white">lucastrombeta@gmail.com</span></div>
+                  <div className="text-[10px] text-slate-350">Senha: <span className="text-white">admin123</span></div>
+                </div>
+                <div className="border-t border-slate-900 pt-1.5">
+                  <span className="text-emerald-400 font-semibold block">Acesso do Cliente:</span>
+                  <p className="text-[10px] leading-relaxed text-slate-400 mt-0.5 font-sans">
+                    Use o e-mail e a senha cadastrados lá no registro de clientes para o cliente acessar seu perfil aeronáutico próprio de forma restrita.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full text-center text-[10px] text-slate-600">
+          AeroManut • Acesso Restrito • {new Date().getFullYear()}
+        </div>
+      </div>
+    );
+  }
 
   if (!dbStatus.connected) {
     return (
@@ -516,6 +712,31 @@ export default function App() {
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Controle de Manutenção Aeronáutica</p>
             </div>
           </div>
+
+          <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-700/30 sm:border-transparent">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 bg-slate-700/60 rounded-lg flex items-center justify-center border border-slate-600/30">
+                <User className="w-4 h-4 text-sky-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold text-slate-200">
+                  {currentUser?.nome || 'Usuário'}
+                </div>
+                <div className="text-[9px] text-sky-400 font-semibold tracking-wider uppercase font-mono">
+                  {userRole === 'admin' ? 'Administrador' : 'Acesso Cliente'}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/20 hover:bg-red-950/60 border border-red-900/40 text-[11px] font-semibold text-red-400 transition-all cursor-pointer"
+              title="Sair do Sistema"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -561,23 +782,25 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
               
               {/* Clientes (Eixo Esquerdo - 5 das 12 colunas) */}
-              <div className="md:col-span-5 h-full">
-                <ClientesList
-                  clientes={clientes}
-                  onSelectCliente={(c) => {
-                    setSelectedCliente(c);
-                    setSelectedAeronave(null); // Reseta aeronave quando muda de cliente
-                  }}
-                  selectedClienteId={selectedCliente?.id || null}
-                  onAddCliente={handleAddCliente}
-                  onUpdateCliente={handleUpdateCliente}
-                  onDeleteCliente={handleDeleteCliente}
-                  aeronavesCount={aeronavesCountMap}
-                />
-              </div>
+              {userRole === 'admin' && (
+                <div className="md:col-span-12 lg:col-span-5 h-full">
+                  <ClientesList
+                    clientes={clientes}
+                    onSelectCliente={(c) => {
+                      setSelectedCliente(c);
+                      setSelectedAeronave(null); // Reseta aeronave quando muda de cliente
+                    }}
+                    selectedClienteId={selectedCliente?.id || null}
+                    onAddCliente={handleAddCliente}
+                    onUpdateCliente={handleUpdateCliente}
+                    onDeleteCliente={handleDeleteCliente}
+                    aeronavesCount={aeronavesCountMap}
+                  />
+                </div>
+              )}
 
-              {/* Aeronaves (Eixo Direito - 7 das 12 colunas) */}
-              <div className="md:col-span-7 h-full">
+              {/* Aeronaves (Eixo Direito - 7 das 12 colunas ou 12 cheias se cliente) */}
+              <div className={userRole === 'admin' ? "md:col-span-12 lg:col-span-7 h-full" : "md:col-span-12 h-full"}>
                 <AeronavesList
                   aeronaves={aeronaves}
                   selectedCliente={selectedCliente}

@@ -1,41 +1,111 @@
 import { Pool } from 'pg';
+import fs from 'fs';
+import path from 'path';
 import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, RevisaoLaudo } from '../types';
 
 let pool: Pool | null = null;
 let dbConnectionError: string | null = null;
 
-// Determina se devemos usar PostgreSQL
-const dbUrl = process.env.DATABASE_URL;
-const pgHost = process.env.PGHOST || process.env.POSTGRES_HOST;
+const CONFIG_FILE_PATH = path.join(process.cwd(), 'db-config.json');
 
-function getPoolConfig() {
-  return dbUrl ? { connectionString: dbUrl } : {
+// Função auxiliar para carregar a URL dinâmica se gravada
+function getActiveDatabaseUrl(): string | undefined {
+  if (fs.existsSync(CONFIG_FILE_PATH)) {
+    try {
+      const data = fs.readFileSync(CONFIG_FILE_PATH, 'utf8');
+      const parsed = JSON.parse(data);
+      if (parsed.databaseUrl) {
+        return parsed.databaseUrl;
+      }
+    } catch (e) {
+      console.error('Erro ao ler db-config.json:', e);
+    }
+  }
+  return process.env.DATABASE_URL;
+}
+
+function getPoolConfig(customUrl?: string) {
+  const activeUrl = customUrl || getActiveDatabaseUrl();
+  const pgHost = process.env.PGHOST || process.env.POSTGRES_HOST;
+  
+  if (activeUrl) {
+    return { connectionString: activeUrl };
+  }
+  
+  return {
     host: pgHost,
     user: process.env.PGUSER || process.env.POSTGRES_USER,
     password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
     database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'postgres',
     port: parseInt(process.env.PGPORT || process.env.POSTGRES_PORT || '5432', 10),
-    ssl: process.env.PGSSL === 'true' || dbUrl?.includes('ssl') ? { rejectUnauthorized: false } : undefined
+    ssl: process.env.PGSSL === 'true' || activeUrl?.includes('ssl') ? { rejectUnauthorized: false } : undefined
   };
 }
 
-// Inicialização inicial do Pool principal
-if (dbUrl || pgHost) {
+function setupPool(customUrl?: string) {
   try {
+    if (pool) {
+      pool.end().catch(() => {});
+    }
+    const config = getPoolConfig(customUrl);
     pool = new Pool({
-      ...getPoolConfig(),
+      ...config,
       max: 15,
       idleTimeoutMillis: 30005,
       connectionTimeoutMillis: 5000,
     });
-    console.log('PostgreSQL Pool configurado com sucesso.');
+    dbConnectionError = null;
+    console.log('PostgreSQL Pool configurado dinamicamente com sucesso.');
   } catch (err: any) {
     dbConnectionError = err?.message || String(err);
     console.error('Falha ao configurar Pool do PostgreSQL:', err);
   }
+}
+
+// Inicialização inicial do Pool principal
+const initialUrl = getActiveDatabaseUrl();
+const initialPgHost = process.env.PGHOST || process.env.POSTGRES_HOST;
+
+if (initialUrl || initialPgHost) {
+  setupPool();
 } else {
   dbConnectionError = 'Variáveis de ambiente de banco de dados (DATABASE_URL ou PGHOST) não configuradas no sistema.';
   console.error(dbConnectionError);
+}
+
+// Para reconfigurar o banco em tempo de execução via tela de erro
+export async function reconfigureAndInitDb(newUrl: string): Promise<void> {
+  if (!newUrl || (!newUrl.startsWith('postgres://') && !newUrl.startsWith('postgresql://'))) {
+    throw new Error('A URL de conexão deve iniciar com postgres:// ou postgresql://');
+  }
+
+  // Tenta conectar usando um pool temporário de validação
+  const testPool = new Pool({
+    connectionString: newUrl,
+    connectionTimeoutMillis: 5000,
+  });
+
+  try {
+    const client = await testPool.connect();
+    client.release();
+  } catch (err: any) {
+    throw new Error(`Falha ao conectar com essa URL na base de dados: ${err.message}`);
+  } finally {
+    await testPool.end().catch(() => {});
+  }
+
+  // Grava a URL no arquivo local se funcionar
+  try {
+    fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify({ databaseUrl: newUrl }, null, 2), 'utf8');
+  } catch (err: any) {
+    throw new Error(`Não foi possível salvar o arquivo de configuração db-config.json: ${err.message}`);
+  }
+
+  // Recria o pool principal
+  setupPool(newUrl);
+
+  // Inicializa tabelas
+  await initDb();
 }
 
 // Para exportarmos o estado do banco

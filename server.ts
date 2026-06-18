@@ -22,7 +22,8 @@ import {
   getRevisoes,
   addRevisao,
   deleteRevisao,
-  getDbConnectionStatus
+  getDbConnectionStatus,
+  reconfigureAndInitDb
 } from './src/server/db.js';
 
 async function startServer() {
@@ -46,6 +47,21 @@ async function startServer() {
       time: new Date().toISOString(),
       database: dbStatus
     });
+  });
+
+  // Reconfigurar conexão do banco em tempo de execução
+  app.post('/api/config-database', async (req, res) => {
+    const { databaseUrl } = req.body;
+    if (!databaseUrl) {
+      return res.status(400).json({ success: false, error: 'A URL de conexão (databaseUrl) é obrigatória.' });
+    }
+    
+    try {
+      await reconfigureAndInitDb(databaseUrl);
+      res.json({ success: true, message: 'Banco de dados configurado e tabelas inicializadas com sucesso!' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Erro ao reconfigurar banco de dados.' });
+    }
   });
 
   // --- CLIENTES ---

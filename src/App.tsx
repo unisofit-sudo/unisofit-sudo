@@ -32,6 +32,54 @@ export default function App() {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Estados adicionais para configurar a base de dados dinamicamente pela tela de erro
+  const [customDbUrl, setCustomDbUrl] = useState('');
+  const [isConfiguring, setIsConfiguring] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configSuccess, setConfigSuccess] = useState<string | null>(null);
+  const [showConfigForm, setShowConfigForm] = useState(false);
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customDbUrl) {
+      setConfigError('Por favor, informe uma URL de conexão válida.');
+      return;
+    }
+    if (!customDbUrl.startsWith('postgres://') && !customDbUrl.startsWith('postgresql://')) {
+      setConfigError('A URL de conexão deve começar com "postgres://" ou "postgresql://".');
+      return;
+    }
+    setIsConfiguring(true);
+    setConfigError(null);
+    setConfigSuccess(null);
+    
+    try {
+      const response = await fetch('/api/config-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ databaseUrl: customDbUrl })
+      });
+      
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setConfigSuccess('Banco de dados reconfigurado e tabelas inicializadas com sucesso! Sincronizando dados...');
+        setTimeout(() => {
+          fetchBasics();
+          setShowConfigForm(false);
+          setConfigSuccess(null);
+        }, 1500);
+      } else {
+        setConfigError(data.error || 'Erro ao conectar na base de dados com as informações fornecidas.');
+      }
+    } catch (err: any) {
+      setConfigError('Erro de rede ao conectar à API do servidor. Verifique se o container está rodando.');
+    } finally {
+      setIsConfiguring(false);
+    }
+  };
+
   // --- BUSCAR DADOS DO BACKEND ---
   const fetchBasics = async () => {
     setIsRefreshing(true);
@@ -257,6 +305,85 @@ export default function App() {
               <div className="bg-slate-950 border border-red-950/50 text-red-400 font-mono text-xs rounded-xl p-4 whitespace-pre-wrap select-all shadow-inner max-h-48 overflow-y-auto leading-relaxed">
                 {dbStatus.error || 'Nenhum detalhe adicional de erro retornado pelo servidor.'}
               </div>
+            </div>
+
+            {/* FORMULÁRIO DE CONFIGURAÇÃO MANUAL DENTRO DA TELA DE ERRO */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              {!showConfigForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowConfigForm(true)}
+                  className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700/80 border border-slate-700/60 rounded-xl text-xs font-semibold text-sky-400 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  Configurar Conexão Manualmente (Bypass VPS)
+                </button>
+              ) : (
+                <form onSubmit={handleSaveConfig} className="space-y-3 bg-slate-950/60 p-4 border border-slate-850 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Database className="w-4 h-4 text-sky-400" />
+                      Configurar Conexão Direta
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowConfigForm(false);
+                        setConfigError(null);
+                        setConfigSuccess(null);
+                      }}
+                      className="text-[11px] text-slate-500 hover:text-slate-300"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  
+                  <p className="text-[11px] text-slate-400 leading-normal">
+                    Informe abaixo uma string de conexão PostgreSQL (DATABASE_URL) alternativa para que a aplicação utilize diretamente de forma sobressalente.
+                  </p>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      DATABASE_URL do PostgreSQL:
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-all"
+                      placeholder="postgresql://usuario:senha@endereco-externo-ou-interno:5432/nomedobanco"
+                      value={customDbUrl}
+                      onChange={(e) => setCustomDbUrl(e.target.value)}
+                      disabled={isConfiguring}
+                    />
+                  </div>
+
+                  {configError && (
+                    <div className="bg-red-950/40 border border-red-900/55 rounded-lg p-2.5 text-[11px] text-red-400 font-mono whitespace-pre-wrap leading-normal">
+                      {configError}
+                    </div>
+                  )}
+
+                  {configSuccess && (
+                    <div className="bg-emerald-950/40 border border-emerald-900/55 rounded-lg p-2.5 text-[11px] text-emerald-400 leading-normal font-sans">
+                      {configSuccess}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isConfiguring}
+                    className="w-full py-2.5 px-4 bg-sky-500 hover:bg-sky-450 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-sky-500/10"
+                  >
+                    {isConfiguring ? (
+                      <>
+                        <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Testando e Gravando...
+                      </>
+                    ) : (
+                      'Salvar e Testar Conexão'
+                    )}
+                  </button>
+                </form>
+              )}
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-800">

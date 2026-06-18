@@ -42,7 +42,18 @@ export default function App() {
         throw new Error(`O servidor respondeu com status ${healthRes.status}`);
       }
       
-      const healthData = await healthRes.json();
+      const contentType = healthRes.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('O proxy da VPS retornou uma página HTML em vez de JSON da API (502 Bad Gateway ou fallback estático do Nginx). Verifique se o backend está iniciado.');
+      }
+      
+      let healthData;
+      try {
+        healthData = await healthRes.json();
+      } catch (jsonErr) {
+        throw new Error('Resposta inválida do servidor (não é um JSON válido). Possível erro no proxy ou servidor fora do ar.');
+      }
+      
       const dbInfo = healthData.database || { connected: false, error: 'Sem informações do banco do servidor.' };
       
       if (!dbInfo.connected) {
@@ -59,6 +70,12 @@ export default function App() {
 
       if (!cliRes.ok || !aeroRes.ok) {
         throw new Error('Falha ao responder com os dados primários de produção.');
+      }
+
+      const clientContentType = cliRes.headers.get('content-type');
+      const aeroContentType = aeroRes.headers.get('content-type');
+      if (!clientContentType?.includes('application/json') || !aeroContentType?.includes('application/json')) {
+        throw new Error('Os endpoints de dados retornaram conteúdo inválido (HTML em vez de JSON).');
       }
 
       const clientList = await cliRes.json();
@@ -248,9 +265,18 @@ export default function App() {
                 Dicas de Solução para VPS / Coolify:
               </span>
               <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside leading-normal">
-                <li>Defina a variável <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">DATABASE_URL</code> com uma URL de conexão válida.</li>
-                <li>Ou configure separadamente as variáveis: <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded flex-wrap">PGHOST</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGUSER</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGPASSWORD</code>, <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGDATABASE</code> e <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGPORT</code>.</li>
-                <li>Verifique se o container ou serviço do PostgreSQL está rodando e acessível na mesma rede privada do Coolify/VPS.</li>
+                <li>
+                  <strong className="text-slate-200">Rede Docker (Coolify):</strong> Se o PostgreSQL estiver rodando em outro container na VPS, certifique-se de que ambos os serviços pertencem à mesma rede privada do Docker.
+                </li>
+                <li>
+                  <strong className="text-slate-200">Endereço Interno vs Externo:</strong> Não use <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">localhost</code> ou o endereço IP externo dentro da VPS. Use o <strong className="text-slate-200">Domain / Internal Hostname</strong> do container PostgreSQL que o Coolify fornece (ex: <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">database-service-name</code> ou o formato <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">postgresql://usuario:senha@service-id:5432/db</code>).
+                </li>
+                <li>
+                  Use a <strong className="text-slate-200">Internal Connection String</strong> disponível na aba de configurações do banco de dados no painel do Coolify.
+                </li>
+                <li>
+                  Certifique-se de preencher a variável <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">DATABASE_URL</code> ou o conjunto <code className="text-slate-200 font-mono bg-slate-950 px-1 py-0.5 rounded">PGHOST</code> nos Environment Variables do container do aplicativo no Coolify.
+                </li>
               </ul>
             </div>
           </div>

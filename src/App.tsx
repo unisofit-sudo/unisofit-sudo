@@ -33,7 +33,11 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Estados adicionais para configurar a base de dados dinamicamente pela tela de erro
-  const [customDbUrl, setCustomDbUrl] = useState('');
+  const [dbHost, setDbHost] = useState('');
+  const [dbUser, setDbUser] = useState('');
+  const [dbPassword, setDbPassword] = useState('');
+  const [dbPort, setDbPort] = useState('5432');
+  const [dbName, setDbName] = useState('');
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
@@ -41,14 +45,14 @@ export default function App() {
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customDbUrl) {
-      setConfigError('Por favor, informe uma URL de conexão válida.');
+    if (!dbHost || !dbUser || !dbPort || !dbName) {
+      setConfigError('Por favor, preencha os campos obrigatórios (Host, Usuário, Porta e Nome do Banco).');
       return;
     }
-    if (!customDbUrl.startsWith('postgres://') && !customDbUrl.startsWith('postgresql://')) {
-      setConfigError('A URL de conexão deve começar com "postgres://" ou "postgresql://".');
-      return;
-    }
+    
+    // Constrói a URL de conexão do PostgreSQL
+    const constructedUrl = `postgresql://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPassword)}@${dbHost}:${dbPort}/${dbName}`;
+    
     setIsConfiguring(true);
     setConfigError(null);
     setConfigSuccess(null);
@@ -59,7 +63,7 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ databaseUrl: customDbUrl })
+        body: JSON.stringify({ databaseUrl: constructedUrl })
       });
       
       const data = await response.json();
@@ -319,7 +323,7 @@ export default function App() {
                   Configurar Conexão Manualmente (Bypass VPS)
                 </button>
               ) : (
-                <form onSubmit={handleSaveConfig} className="space-y-3 bg-slate-950/60 p-4 border border-slate-850 rounded-xl">
+                <form onSubmit={handleSaveConfig} className="space-y-3 bg-slate-950/60 p-4 border border-slate-850 rounded-xl text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                       <Database className="w-4 h-4 text-sky-400" />
@@ -339,19 +343,81 @@ export default function App() {
                   </div>
                   
                   <p className="text-[11px] text-slate-400 leading-normal">
-                    Informe abaixo uma string de conexão PostgreSQL (DATABASE_URL) alternativa para que a aplicação utilize diretamente de forma sobressalente.
+                    Informe os dados de conexão do seu PostgreSQL. Eles serão validados e configurados diretamente na aplicação de forma sobressalente.
                   </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Host / Servidor:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-all font-mono"
+                        placeholder="Ex: postgres-db ou ip_vps"
+                        value={dbHost}
+                        onChange={(e) => setDbHost(e.target.value)}
+                        disabled={isConfiguring}
+                      />
+                    </div>
+                    <div className="col-span-1 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Porta:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-all font-mono"
+                        placeholder="5432"
+                        value={dbPort}
+                        onChange={(e) => setDbPort(e.target.value)}
+                        disabled={isConfiguring}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Usuário:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-all font-mono"
+                        placeholder="Ex: postgres"
+                        value={dbUser}
+                        onChange={(e) => setDbUser(e.target.value)}
+                        disabled={isConfiguring}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Senha:
+                      </label>
+                      <input
+                        type="password"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-all font-mono"
+                        placeholder="Sua senha"
+                        value={dbPassword}
+                        onChange={(e) => setDbPassword(e.target.value)}
+                        disabled={isConfiguring}
+                      />
+                    </div>
+                  </div>
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      DATABASE_URL do PostgreSQL:
+                      Nome do Banco de Dados:
                     </label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-all"
-                      placeholder="postgresql://usuario:senha@endereco-externo-ou-interno:5432/nomedobanco"
-                      value={customDbUrl}
-                      onChange={(e) => setCustomDbUrl(e.target.value)}
+                      required
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-all font-mono"
+                      placeholder="Ex: aviation2"
+                      value={dbName}
+                      onChange={(e) => setDbName(e.target.value)}
                       disabled={isConfiguring}
                     />
                   </div>

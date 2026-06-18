@@ -8,24 +8,26 @@ let dbConnectionError: string | null = null;
 const dbUrl = process.env.DATABASE_URL;
 const pgHost = process.env.PGHOST || process.env.POSTGRES_HOST;
 
+function getPoolConfig() {
+  return dbUrl ? { connectionString: dbUrl } : {
+    host: pgHost,
+    user: process.env.PGUSER || process.env.POSTGRES_USER,
+    password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
+    database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'postgres',
+    port: parseInt(process.env.PGPORT || process.env.POSTGRES_PORT || '5432', 10),
+    ssl: process.env.PGSSL === 'true' || dbUrl?.includes('ssl') ? { rejectUnauthorized: false } : undefined
+  };
+}
+
+// Inicialização inicial do Pool principal
 if (dbUrl || pgHost) {
   try {
-    const config = dbUrl ? { connectionString: dbUrl } : {
-      host: pgHost,
-      user: process.env.PGUSER || process.env.POSTGRES_USER,
-      password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
-      database: process.env.PGDATABASE || process.env.POSTGRES_DB || 'postgres',
-      port: parseInt(process.env.PGPORT || process.env.POSTGRES_PORT || '5432', 10),
-      ssl: process.env.PGSSL === 'true' || dbUrl?.includes('ssl') ? { rejectUnauthorized: false } : undefined
-    };
-    
     pool = new Pool({
-      ...config,
+      ...getPoolConfig(),
       max: 15,
       idleTimeoutMillis: 30005,
       connectionTimeoutMillis: 5000,
     });
-    
     console.log('PostgreSQL Pool configurado com sucesso.');
   } catch (err: any) {
     dbConnectionError = err?.message || String(err);
@@ -72,8 +74,16 @@ export async function initDb() {
     return;
   }
   
+  let client;
   try {
-    const client = await pool.connect();
+    client = await pool.connect();
+  } catch (err: any) {
+    dbConnectionError = 'Falha de Conexão com o Banco de Dados PostgreSQL: ' + (err?.message || String(err));
+    console.error(dbConnectionError, err);
+    return;
+  }
+  
+  if (client) {
     try {
       console.log('Verificando/Criando tabelas no PostgreSQL...');
       
@@ -143,12 +153,13 @@ export async function initDb() {
         );
       `);
       console.log('Tabelas PostgreSQL inicializadas com sucesso.');
+      dbConnectionError = null; // Limpa qualquer erro anterior de conexão
+    } catch (err: any) {
+      dbConnectionError = 'Falha ao inicializar tabelas no PostgreSQL: ' + (err?.message || String(err));
+      console.error(dbConnectionError, err);
     } finally {
       client.release();
     }
-  } catch (err: any) {
-    dbConnectionError = 'Falha de Conexão com o Banco de Dados PostgreSQL: ' + (err?.message || String(err));
-    console.error(dbConnectionError, err);
   }
 }
 

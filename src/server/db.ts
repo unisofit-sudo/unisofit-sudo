@@ -213,9 +213,15 @@ export async function initDb() {
           data_instalacao VARCHAR(20),
           ultima_revisao_horas DOUBLE PRECISION DEFAULT 0,
           ultima_revisao_data VARCHAR(20),
+          nome_anexo VARCHAR(255),
+          dados_anexo TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_comp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
+
+        -- Garante suporte a evolução do schema caso a tabela já exista
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS nome_anexo VARCHAR(255);
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS dados_anexo TEXT;
         
         CREATE TABLE IF NOT EXISTS revisoes (
           id VARCHAR(100) PRIMARY KEY,
@@ -490,6 +496,8 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       dataInstalacao: row.data_instalacao,
       ultimaRevisaoHoras: Number(row.ultima_revisao_horas),
       ultimaRevisaoData: row.ultima_revisao_data,
+      nomeAnexo: row.nome_anexo || undefined,
+      dadosAnexo: row.dados_anexo || undefined,
       created_at: row.created_at
     }));
   } catch (err: any) {
@@ -501,11 +509,11 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo } = comp;
     await p.query(
-      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData]
+      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null]
     );
     return comp;
   } catch (err: any) {
@@ -517,10 +525,10 @@ export async function addComponente(comp: ComponenteControlado): Promise<Compone
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo } = comp;
     await p.query(
-      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10 WHERE id = $11`,
-      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, id]
+      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12 WHERE id = $13`,
+      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, id]
     );
     return comp;
   } catch (err: any) {

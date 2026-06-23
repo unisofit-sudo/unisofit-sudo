@@ -67,6 +67,8 @@ export default function AeronaveDetail({
   const [compDataInstalacao, setCompDataInstalacao] = useState(new Date().toISOString().split('T')[0]);
   const [compUltimaRevisaoHoras, setCompUltimaRevisaoHoras] = useState(aeronave.horasTotais);
   const [compUltimaRevisaoData, setCompUltimaRevisaoData] = useState(new Date().toISOString().split('T')[0]);
+  const [compAttachmentName, setCompAttachmentName] = useState('');
+  const [compAttachmentData, setCompAttachmentData] = useState('');
 
   // Formulário: Nova Revisão / Carga de Laudo
   const [isRevFormOpen, setIsRevFormOpen] = useState(false);
@@ -171,7 +173,9 @@ export default function AeronaveDetail({
       horasInstalacao: Number(compHorasInstalacao || 0),
       dataInstalacao: compDataInstalacao,
       ultimaRevisaoHoras: Number(compUltimaRevisaoHoras || 0),
-      ultimaRevisaoData: compUltimaRevisaoData
+      ultimaRevisaoData: compUltimaRevisaoData,
+      nomeAnexo: compAttachmentName || undefined,
+      dadosAnexo: compAttachmentData || undefined
     };
 
     try {
@@ -203,6 +207,8 @@ export default function AeronaveDetail({
     setCompDataInstalacao(c.dataInstalacao);
     setCompUltimaRevisaoHoras(c.ultimaRevisaoHoras);
     setCompUltimaRevisaoData(c.ultimaRevisaoData);
+    setCompAttachmentName(c.nomeAnexo || '');
+    setCompAttachmentData(c.dadosAnexo || '');
     setIsCompFormOpen(true);
   };
 
@@ -233,6 +239,39 @@ export default function AeronaveDetail({
       setAttachmentData(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCompFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('O arquivo selecionado excede o limite recomendado de 15MB para transferência.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCompAttachmentName(file.name);
+      setCompAttachmentData(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openNovoComponente = () => {
+    setCompEditing(null);
+    setCompNome('');
+    setCompPartNumber('');
+    setCompSerialNumber('');
+    setCompLimiteHoras(500);
+    setCompLimiteDias(365);
+    setCompHorasInstalacao(aeronave.horasTotais);
+    setCompDataInstalacao(new Date().toISOString().split('T')[0]);
+    setCompUltimaRevisaoHoras(aeronave.horasTotais);
+    setCompUltimaRevisaoData(new Date().toISOString().split('T')[0]);
+    setCompAttachmentName('');
+    setCompAttachmentData('');
+    setIsCompFormOpen(true);
   };
 
   // --- SUBMISSÃO REVISÃO / LAUDO ---
@@ -608,637 +647,681 @@ export default function AeronaveDetail({
           </div>
         )}
 
-        {/* --- TAB 2: COMPONENTES CONTROLADOS --- */}
         {!loading && activeTab === 'componentes' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-display font-bold text-white tracking-tight">Componentes e Peças Controladas</h3>
-                <p className="text-xs text-slate-400">Cadastre as peças que possuem desgaste por horas de voo ou tempo limite.</p>
-              </div>
-              <button
-                onClick={() => { setCompEditing(null); setIsCompFormOpen(true); }}
-                className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-              >
-                <Plus className="w-4 h-4" />
-                Cadastrar Componente
-              </button>
-            </div>
-
-            {componentes.length === 0 ? (
-              <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
-                Nenhum componente mapeado nesta aeronave. Inicie o rastreamento clicando no botão acima!
-              </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
-                      <th className="p-4">Componente</th>
-                      <th className="p-4">P/N e S/N</th>
-                      <th className="p-4">Limites Fixados</th>
-                      <th className="p-4">Instalação na Aeronave</th>
-                      <th className="p-4">Última Revisão Realizada</th>
-                      <th className="p-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                    {componentes.map((c) => {
-                      const alerta = calcularAlerta(c, aeronave);
-                      return (
-                        <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
-                          <td className="p-4 font-semibold text-white">
-                            <div className="flex items-center gap-2.5">
-                              <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
-                                alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
-                              }`} title={`Status: ${alerta.status}`}></span>
-                              <span>{c.nome}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
-                              <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
-                              <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
-                            </div>
-                          </td>
-                          <td className="p-4 font-semibold text-slate-200">
-                            <div className="space-y-0.5">
-                              {c.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {c.limiteHoras} hs voo</div>}
-                              {c.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {c.limiteDias} dias can.</div>}
-                              {c.limiteHoras === 0 && c.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div className="space-y-0.5 text-slate-300">
-                              <div>{formatDataBR(c.dataInstalacao)}</div>
-                              <div className="text-slate-500 text-[10px] font-mono">Com {c.horasInstalacao} hs voo</div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div className="space-y-0.5 text-slate-300">
-                              <div>{formatDataBR(c.ultimaRevisaoData)}</div>
-                              <div className="text-slate-500 text-[10px] font-mono">Aos {c.ultimaRevisaoHoras} hs voo</div>
-                            </div>
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => openRevisaoForComponente(c)}
-                                className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                title="Anexar Revisão"
-                              >
-                                <Upload className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleEditComponente(c)}
-                                className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                title="Editar"
-                              >
-                                <History className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteComponente(c.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Modal de Cadastro de Componente */}
-            {isCompFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden flex flex-col my-auto select-none">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
-                    <h3 className="font-display font-semibold text-sm">
-                      {compEditing ? 'Editar Componente' : 'Novo Componente Controlado'}
-                    </h3>
-                    <button
-                      onClick={() => setIsCompFormOpen(false)}
-                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <form onSubmit={handleSaveComponente} className="p-5 space-y-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Nome do Componente ou Peça *</label>
-                        <input
-                          type="text"
-                          required
-                          value={compNome}
-                          onChange={(e) => setCompNome(e.target.value)}
-                          placeholder="Ex: Magneto do Motor Esquerdo, Turbocompressor"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-medium placeholder-slate-650"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Part Number (P/N)</label>
-                        <input
-                          type="text"
-                          value={compPartNumber}
-                          onChange={(e) => setCompPartNumber(e.target.value)}
-                          placeholder="Ex: PN-90234"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-650"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">Serial Number (S/N)</label>
-                        <input
-                          type="text"
-                          value={compSerialNumber}
-                          onChange={(e) => setCompSerialNumber(e.target.value)}
-                          placeholder="Ex: SN-54231-G"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-650"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-950/50 p-4.5 rounded-xl space-y-4 border border-slate-800">
-                      <p className="text-[10px] uppercase font-black tracking-widest text-sky-400 font-mono">Parâmetros de Limites e Vencimentos</p>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Limite por Horas Voadas</label>
-                          <input
-                            type="number"
-                            value={compLimiteHoras}
-                            onChange={(e) => setCompLimiteHoras(Number(e.target.value))}
-                            min={0}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono"
-                          />
-                          <span className="text-[9px] text-slate-500 italic mt-1 block leading-normal">Zere se não for controlado por horas</span>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Limite por Dias Calendário</label>
-                          <input
-                            type="number"
-                            value={compLimiteDias}
-                            onChange={(e) => setCompLimiteDias(Number(e.target.value))}
-                            min={0}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono"
-                          />
-                          <span className="text-[9px] text-slate-500 italic mt-1 block leading-normal">Zere se não houver validade temporal</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-405 mb-1">Data da Instalação *</label>
-                        <input
-                          type="date"
-                          required
-                          value={compDataInstalacao}
-                          onChange={(e) => setCompDataInstalacao(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-405 mb-1">H.V. da Aeronave na Instalação *</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          required
-                          value={compHorasInstalacao}
-                          onChange={(e) => setCompHorasInstalacao(Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-slate-405 mb-1">Data Última Revisão *</label>
-                        <input
-                          type="date"
-                          required
-                          value={compUltimaRevisaoData}
-                          onChange={(e) => setCompUltimaRevisaoData(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-405 mb-1">H.V. Aeronave na Última Revisão *</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          required
-                          value={compUltimaRevisaoHoras}
-                          onChange={(e) => setCompUltimaRevisaoHoras(Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsCompFormOpen(false)}
-                        className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2.5 text-xs font-medium text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-                      >
-                        {compEditing ? 'Salvar Edição' : 'Cadastrar Componente'}
-                      </button>
-                    </div>
-                  </form>
+          isCompFormOpen ? (
+            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-850">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
+                    <Wrench className="w-5 h-5 text-sky-400" />
+                    {compEditing ? 'Editar Componente' : 'Cadastrar Componente Controlado'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Preencha os dados do componente e seus limites de rastreamento.</p>
                 </div>
+                <button
+                  onClick={() => setIsCompFormOpen(false)}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-800"
+                >
+                  ✕ Voltar
+                </button>
               </div>
-            )}
-          </div>
+
+              <form onSubmit={handleSaveComponente} className="space-y-6">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome do Componente ou Peça *</label>
+                    <input
+                      type="text"
+                      required
+                      value={compNome}
+                      onChange={(e) => setCompNome(e.target.value)}
+                      placeholder="Ex: Magneto do Motor Esquerdo, Turbocompressor"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-medium placeholder-slate-600 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Part Number (P/N)</label>
+                    <input
+                      type="text"
+                      value={compPartNumber}
+                      onChange={(e) => setCompPartNumber(e.target.value)}
+                      placeholder="Ex: PN-90234"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Serial Number (S/N)</label>
+                    <input
+                      type="text"
+                      value={compSerialNumber}
+                      onChange={(e) => setCompSerialNumber(e.target.value)}
+                      placeholder="Ex: SN-54231-G"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/50 p-5 rounded-xl space-y-4 border border-slate-800">
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-sky-400 font-mono">Parâmetros de Limites e Vencimentos</p>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Limite por Horas Voadas</label>
+                      <input
+                        type="number"
+                        value={compLimiteHoras}
+                        onChange={(e) => setCompLimiteHoras(Number(e.target.value))}
+                        min={0}
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                      />
+                      <span className="text-[9px] text-slate-500 italic mt-1.5 block leading-normal">Zere se não for controlado por horas</span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Limite por Dias Calendário</label>
+                      <input
+                        type="number"
+                        value={compLimiteDias}
+                        onChange={(e) => setCompLimiteDias(Number(e.target.value))}
+                        min={0}
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                      />
+                      <span className="text-[9px] text-slate-500 italic mt-1.5 block leading-normal">Zere se não houver validade temporal</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data da Instalação *</label>
+                    <input
+                      type="date"
+                      required
+                      value={compDataInstalacao}
+                      onChange={(e) => setCompDataInstalacao(e.target.value)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">H.V. da Aeronave na Instalação *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={compHorasInstalacao}
+                      onChange={(e) => setCompHorasInstalacao(Number(e.target.value))}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data Última Revisão *</label>
+                    <input
+                      type="date"
+                      required
+                      value={compUltimaRevisaoData}
+                      onChange={(e) => setCompUltimaRevisaoData(e.target.value)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">H.V. Aeronave na Última Revisão *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={compUltimaRevisaoHoras}
+                      onChange={(e) => setCompUltimaRevisaoHoras(Number(e.target.value))}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-105 font-mono transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Anexar Documento, Ficha Técnica ou Nota Fiscal (PDF ou Imagem)</label>
+                  <div className="border border-dashed border-slate-700 rounded-xl p-5 bg-slate-950/20 text-center relative hover:bg-slate-950/40 transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={handleCompFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <div className="space-y-1">
+                      <Upload className="w-6 h-6 text-slate-500 mx-auto" />
+                      <p className="text-xs text-slate-300">
+                        {compAttachmentName ? (
+                          <strong className="text-slate-100 flex items-center justify-center gap-1">
+                            <Paperclip className="w-3.5 h-3.5 text-sky-400" />
+                            {compAttachmentName} (Alterar)
+                          </strong>
+                        ) : (
+                          'Clique ou arraste o arquivo aqui para fazer o upload'
+                        )}
+                      </p>
+                      <p className="text-[10px] text-slate-500">Tamanho máximo recomendado: 15MB</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsCompFormOpen(false)}
+                    className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-lg shadow-sky-500/10"
+                  >
+                    {compEditing ? 'Salvar Edição' : 'Cadastrar Componente'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight">Componentes e Peças Controladas</h3>
+                  <p className="text-xs text-slate-400">Cadastre as peças que possuem desgaste por horas de voo ou tempo limite.</p>
+                </div>
+                <button
+                  onClick={openNovoComponente}
+                  className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                >
+                  <Plus className="w-4 h-4" />
+                  Cadastrar Componente
+                </button>
+              </div>
+
+              {componentes.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
+                  Nenhum componente mapeado nesta aeronave. Inicie o rastreamento clicando no botão acima!
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
+                        <th className="p-4">Componente</th>
+                        <th className="p-4">P/N e S/N</th>
+                        <th className="p-4">Limites Fixados</th>
+                        <th className="p-4">Instalação na Aeronave</th>
+                        <th className="p-4">Última Revisão Realizada</th>
+                        <th className="p-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                      {componentes.map((c) => {
+                        const alerta = calcularAlerta(c, aeronave);
+                        return (
+                          <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
+                            <td className="p-4 font-semibold text-white">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2.5">
+                                  <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
+                                    alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                                  }`} title={`Status: ${alerta.status}`}></span>
+                                  <span>{c.nome}</span>
+                                </div>
+                                {c.nomeAnexo && c.dadosAnexo && (
+                                  <a
+                                    href={c.dadosAnexo}
+                                    download={c.nomeAnexo}
+                                    className="flex items-center gap-1 text-[10px] text-sky-400 font-medium hover:text-sky-350 transition-colors w-fit pl-5 mt-0.5"
+                                    title="Baixar Anexo do Componente"
+                                  >
+                                    <Paperclip className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate max-w-[150px]">{c.nomeAnexo}</span>
+                                    <Download className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
+                                <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
+                                <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
+                              </div>
+                            </td>
+                            <td className="p-4 font-semibold text-slate-200">
+                              <div className="space-y-0.5">
+                                {c.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {c.limiteHoras} hs voo</div>}
+                                {c.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {c.limiteDias} dias can.</div>}
+                                {c.limiteHoras === 0 && c.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-0.5 text-slate-300">
+                                <div>{formatDataBR(c.dataInstalacao)}</div>
+                                <div className="text-slate-500 text-[10px] font-mono">Com {c.horasInstalacao} hs voo</div>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-0.5 text-slate-300">
+                                <div>{formatDataBR(c.ultimaRevisaoData)}</div>
+                                <div className="text-slate-500 text-[10px] font-mono">Aos {c.ultimaRevisaoHoras} hs voo</div>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => openRevisaoForComponente(c)}
+                                  className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                  title="Anexar Revisão"
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleEditComponente(c)}
+                                  className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                  title="Editar"
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComponente(c.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
         )}
 
         {/* --- TAB 3: DIÁRIO DE VOO (HISTÓRICO) --- */}
         {!loading && activeTab === 'voos' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-display font-bold text-white tracking-tight">Diário de Bordo / Histórico de Voos</h3>
-                <p className="text-xs text-slate-400">Registre os voos efetuados. As horas são automaticamente integradas ao contador geral para calcular os alertas de manutenção.</p>
+          isVooFormOpen ? (
+            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-2xl mx-auto animate-fade-in">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-850">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-sky-400" />
+                    Registrar Novo Voo no Diário de Bordo
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Adicione os tempos e roteiro do voo para atualização automática dos tempos limites.</p>
+                </div>
+                <button
+                  onClick={() => setIsVooFormOpen(false)}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-800"
+                >
+                  ✕ Voltar
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setVooData(new Date().toISOString().split('T')[0]);
-                  setIsVooFormOpen(true);
-                }}
-                className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-              >
-                <Plus className="w-4 h-4" />
-                Registrar Novo Voo
-              </button>
-            </div>
 
-            {voos.length === 0 ? (
-              <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
-                Nenhum voo registrado no diário de bordo. Adicione registros para atualizar o tempo em serviço.
+              <form onSubmit={handleAddVoo} className="space-y-6">
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data do Voo *</label>
+                    <input
+                      type="date"
+                      required
+                      value={vooData}
+                      onChange={(e) => setVooData(e.target.value)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Duração de Voo (Hs) *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      min={0.1}
+                      value={vooHoras}
+                      onChange={(e) => setVooHoras(Number(e.target.value))}
+                      placeholder="Ex: 2.3"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Piloto em Comando (PIC) *</label>
+                  <input
+                    type="text"
+                    required
+                    value={vooPiloto}
+                    onChange={(e) => setVooPiloto(e.target.value)}
+                    placeholder="Ex: Almirante Nelson"
+                    className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-605 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Roteiro / Descrição do Diário</label>
+                  <textarea
+                    value={vooDescricao}
+                    onChange={(e) => setVooDescricao(e.target.value)}
+                    placeholder="Ex: Translado SBSP - SBGL. Condições meteorológicas normais, voo VFR."
+                    rows={4}
+                    className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-605 transition-colors"
+                  ></textarea>
+                </div>
+
+                <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsVooFormOpen(false)}
+                    className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-colors cursor-pointer shadow-lg shadow-sky-500/10 active:scale-[0.98]"
+                  >
+                    Adicionar ao Diário
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight">Diário de Bordo / Histórico de Voos</h3>
+                  <p className="text-xs text-slate-400">Registre os voos efetuados. As horas são automaticamente integradas ao contador geral para calcular os alertas de manutenção.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setVooData(new Date().toISOString().split('T')[0]);
+                    setIsVooFormOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                >
+                  <Plus className="w-4 h-4" />
+                  Registrar Novo Voo
+                </button>
               </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
-                      <th className="p-4">Data do Voo</th>
-                      <th className="p-4">Piloto em Comando</th>
-                      <th className="p-4">Duração (Horas)</th>
-                      <th className="p-4">Roteiro / Observações</th>
-                      <th className="p-4 text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                    {voos.map((v) => (
-                      <tr key={v.id} className="hover:bg-slate-850/40 transition-colors" id={`voo-row-${v.id}`}>
-                        <td className="p-4 font-bold text-white">
-                          <span className="flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-sky-400" />
-                            {formatDataBR(v.data)}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className="flex items-center gap-1.5 font-medium text-slate-200">
-                            <User className="w-3.5 h-3.5 text-slate-500" />
-                            <span>{v.piloto || 'N/D'}</span>
-                          </span>
-                        </td>
-                        <td className="p-4 font-black text-sky-400 text-[13px] font-mono">{v.horasVoo.toFixed(1)} hs</td>
-                        <td className="p-4 text-slate-400 font-medium italic">{v.descricao || '-'}</td>
-                        <td className="p-4 text-right">
+
+              {voos.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
+                  Nenhum voo registrado no diário de bordo. Adicione registros para atualizar o tempo em serviço.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
+                        <th className="p-4">Data do Voo</th>
+                        <th className="p-4">Piloto em Comando</th>
+                        <th className="p-4">Duração (Horas)</th>
+                        <th className="p-4">Roteiro / Observações</th>
+                        <th className="p-4 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                      {voos.map((v) => (
+                        <tr key={v.id} className="hover:bg-slate-850/40 transition-colors" id={`voo-row-${v.id}`}>
+                          <td className="p-4 font-bold text-white">
+                            <span className="flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-sky-400" />
+                              {formatDataBR(v.data)}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <span className="flex items-center gap-1.5 font-medium text-slate-200">
+                              <User className="w-3.5 h-3.5 text-slate-500" />
+                              <span>{v.piloto || 'N/D'}</span>
+                            </span>
+                          </td>
+                          <td className="p-4 font-black text-sky-400 text-[13px] font-mono">{v.horasVoo.toFixed(1)} hs</td>
+                          <td className="p-4 text-slate-400 font-medium italic">{v.descricao || '-'}</td>
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => handleDeleteVoo(v.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
+                              title="Excluir Diário"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        )}
+
+        {!loading && activeTab === 'laudos' && (
+          isRevFormOpen ? (
+            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-850">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-sky-400" />
+                    Registrar Nova Ficha de Revisão ou Laudo
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Registre o histórico de manutenção de um componente ou da célula geral e anexe laudos.</p>
+                </div>
+                <button
+                  onClick={() => setIsRevFormOpen(false)}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-800"
+                >
+                  ✕ Voltar
+                </button>
+              </div>
+
+              <form onSubmit={handleAddRevisao} className="space-y-6">
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Componente Alvo</label>
+                    <select
+                      value={revComponenteId}
+                      onChange={(e) => setRevComponenteId(e.target.value)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors text-slate-200"
+                    >
+                      <option value="" className="bg-slate-900">-- Aeronave Geral (Geral ou Célula) --</option>
+                      {componentes.map(comp => (
+                        <option key={comp.id} value={comp.id} className="bg-slate-900 text-slate-100">Peça: {comp.nome} (P/N: {comp.partNumber || 'ND'})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Tipo de Manutenção *</label>
+                    <select
+                      required
+                      value={revTipo}
+                      onChange={(e) => setRevTipo(e.target.value as any)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors text-slate-200"
+                    >
+                      <option value="periodica" className="bg-slate-900">Periódica / Preventiva Requerida</option>
+                      <option value="preventiva" className="bg-slate-900">Inspeção Preventiva Opcional</option>
+                      <option value="corretiva" className="bg-slate-900">Manutenção Corretiva (Substituição de Peça)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data da Execução *</label>
+                    <input
+                      type="date"
+                      required
+                      value={revData}
+                      onChange={(e) => setRevData(e.target.value)}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">H.V. da Aeronave na Revisão *</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={revHoras}
+                      onChange={(e) => setRevHoras(Number(e.target.value))}
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Laudo Descritivo / Serviços Executados *</label>
+                  <textarea
+                    required
+                    value={revDescricao}
+                    onChange={(e) => setRevDescricao(e.target.value)}
+                    placeholder="Descreva detalhadamente o serviço realizado. Ex: Efetuado abertura do magneto, limpeza de platinados, aferição e re-torque com troca da gaxeta de vedação..."
+                    rows={4}
+                    className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-605 transition-colors"
+                  ></textarea>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Anexar Laudo Técnico ou Recibo de Peça (PDF ou Imagem)</label>
+                  <div className="border border-dashed border-slate-700 rounded-xl p-5 bg-slate-950/20 text-center relative hover:bg-slate-950/40 transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <div className="space-y-1">
+                      <Upload className="w-6 h-6 text-slate-500 mx-auto" />
+                      <p className="text-xs text-slate-300">
+                        {attachmentName ? (
+                          <strong className="text-slate-100 flex items-center justify-center gap-1">
+                            <Paperclip className="w-3.5 h-3.5 text-sky-400" />
+                            {attachmentName} (Alterar)
+                          </strong>
+                        ) : (
+                          'Clique ou arraste o arquivo aqui para fazer o upload'
+                        )}
+                      </p>
+                      <p className="text-[10px] text-slate-500">Tamanho máximo recomendado: 15MB</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsRevFormOpen(false)}
+                    className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 rounded-xl transition-all cursor-pointer shadow-lg shadow-sky-500/10 active:scale-[0.98]"
+                  >
+                    Salvar laudo de Revisão
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight">Fichas de Revisão e Laudos das Peças</h3>
+                  <p className="text-xs text-slate-400">Registre revisões, vistorias (Preventivas/Corretivas) e anexe os laudos físicos assinados.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setRevHoras(aeronave.horasTotais);
+                    setIsRevFormOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                >
+                  <Plus className="w-4 h-4" />
+                  Registrar Revisão ou Laudo
+                </button>
+              </div>
+
+              {revisoes.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
+                  Nenhum laudo ou revisão registrados. Clique no botão acima para adicionar a ficha técnica com anexo.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {revisoes.map((r) => {
+                    const compAssociado = componentes.find(c => c.id === r.componenteId);
+                    return (
+                      <div
+                        key={r.id}
+                        className="bg-slate-900 border border-slate-700/65 rounded-2xl p-4.5 hover:shadow-lg hover:shadow-sky-500/2 transition-all flex flex-col justify-between shadow-md"
+                        id={`rev-card-${r.id}`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[9px] px-2 py-0.5 rounded-lg font-bold uppercase tracking-wider ${
+                              r.tipo === 'preventiva' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800' : r.tipo === 'corretiva' ? 'bg-red-950/40 text-red-400 border border-red-800' : 'bg-sky-950/40 text-sky-400 border border-sky-800'
+                            }`}>
+                              REVISÃO {r.tipo}
+                            </span>
+                            <span className="text-slate-400 text-[10px] font-mono">{formatDataBR(r.data)}</span>
+                          </div>
+
+                          <div className="text-xs">
+                            {compAssociado ? (
+                              <p className="font-extrabold text-white flex items-center gap-1.5">
+                                <Wrench className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                                Componente: {compAssociado.nome}
+                              </p>
+                            ) : (
+                              <p className="font-extrabold text-white flex items-center gap-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                Revisão Especial de Célula / Geral
+                              </p>
+                            )}
+                            <p className="text-slate-500 text-[10px] mt-0.5 font-mono">Efetuada aos {r.horasNaRevisao.toFixed(1)} hs voo</p>
+                          </div>
+
+                          <p className="text-xs text-slate-300 bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 font-medium italic">
+                            {r.descricao}
+                          </p>
+                        </div>
+
+                        <div className="border-t border-slate-800/60 mt-4 pt-3 flex items-center justify-between">
+                          {r.nomeAnexo && r.dadosAnexo ? (
+                            <a
+                              href={r.dadosAnexo}
+                              download={r.nomeAnexo}
+                              className="inline-flex items-center gap-1.5 text-xs text-sky-400 font-bold hover:text-sky-350 transition-colors"
+                              title="Baixar Anexo"
+                            >
+                              <Paperclip className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[150px]">{r.nomeAnexo}</span>
+                              <Download className="w-3 h-3 text-sky-400 flex-shrink-0" />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">Nenhum laudo digital anexado</span>
+                          )}
+
                           <button
-                            onClick={() => handleDeleteVoo(v.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
-                            title="Excluir Diário"
+                            onClick={() => handleDeleteRevisao(r.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors border-0"
+                            title="Excluir Registro"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Modal para Adicionar Voo */}
-            {isVooFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700 overflow-hidden flex flex-col my-auto">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
-                    <h3 className="font-display font-semibold text-sm">Registrar Registro de Voo</h3>
-                    <button
-                      onClick={() => setIsVooFormOpen(false)}
-                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <form onSubmit={handleAddVoo} className="p-5 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Data do Voo *</label>
-                        <input
-                          type="date"
-                          required
-                          value={vooData}
-                          onChange={(e) => setVooData(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Duração de Voo (Hs) *</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          required
-                          min={0.1}
-                          value={vooHoras}
-                          onChange={(e) => setVooHoras(Number(e.target.value))}
-                          placeholder="Ex: 2.3"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Piloto em Comando (PIC) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={vooPiloto}
-                        onChange={(e) => setVooPiloto(e.target.value)}
-                        placeholder="Ex: Almirante Nelson"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-650"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Roteiro / Descrição do Diário</label>
-                      <textarea
-                        value={vooDescricao}
-                        onChange={(e) => setVooDescricao(e.target.value)}
-                        placeholder="Ex: Translado SBSP - SBGL. Condições meteorológicas normais, voo VFR."
-                        rows={3}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-650"
-                      ></textarea>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsVooFormOpen(false)}
-                        className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2.5 text-xs font-medium text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-                      >
-                        Adicionar ao Diário
-                      </button>
-                    </div>
-                  </form>
+                    );
+                  })}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- TAB 4: LAUDOS E INSPEÇÕES --- */}
-        {!loading && activeTab === 'laudos' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-display font-bold text-white tracking-tight">Fichas de Revisão e Laudos das Peças</h3>
-                <p className="text-xs text-slate-400">Registre revisões, vistorias (Preventivas/Corretivas) e anexe os laudos físicos assinados.</p>
-              </div>
-              <button
-                onClick={() => {
-                  setRevHoras(aeronave.horasTotais);
-                  setIsRevFormOpen(true);
-                }}
-                className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-              >
-                <Plus className="w-4 h-4" />
-                Registrar Revisão ou Laudo
-              </button>
+              )}
             </div>
-
-            {revisoes.length === 0 ? (
-              <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
-                Nenhum laudo ou revisão registrados. Clique no botão acima para adicionar a ficha técnica com anexo.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {revisoes.map((r) => {
-                  const compAssociado = componentes.find(c => c.id === r.componenteId);
-                  return (
-                    <div
-                      key={r.id}
-                      className="bg-slate-900 border border-slate-700/65 rounded-2xl p-4.5 hover:shadow-lg hover:shadow-sky-500/2 transition-all flex flex-col justify-between shadow-md"
-                      id={`rev-card-${r.id}`}
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className={`text-[9px] px-2 py-0.5 rounded-lg font-bold uppercase tracking-wider ${
-                            r.tipo === 'preventiva' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800' : r.tipo === 'corretiva' ? 'bg-red-950/40 text-red-400 border border-red-800' : 'bg-sky-950/40 text-sky-400 border border-sky-800'
-                          }`}>
-                            REVISÃO {r.tipo}
-                          </span>
-                          <span className="text-slate-400 text-[10px] font-mono">{formatDataBR(r.data)}</span>
-                        </div>
-
-                        <div className="text-xs">
-                          {compAssociado ? (
-                            <p className="font-extrabold text-white flex items-center gap-1.5">
-                              <Wrench className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                              Componente: {compAssociado.nome}
-                            </p>
-                          ) : (
-                            <p className="font-extrabold text-white flex items-center gap-1.5">
-                              <ShieldAlert className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                              Revisão Especial de Célula / Geral
-                            </p>
-                          )}
-                          <p className="text-slate-500 text-[10px] mt-0.5 font-mono">Efetuada aos {r.horasNaRevisao.toFixed(1)} hs voo</p>
-                        </div>
-
-                        <p className="text-xs text-slate-300 bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 font-medium italic">
-                          {r.descricao}
-                        </p>
-                      </div>
-
-                      <div className="border-t border-slate-800/60 mt-4 pt-3 flex items-center justify-between">
-                        {r.nomeAnexo && r.dadosAnexo ? (
-                          <a
-                            href={r.dadosAnexo}
-                            download={r.nomeAnexo}
-                            className="inline-flex items-center gap-1.5 text-xs text-sky-400 font-bold hover:text-sky-350 transition-colors"
-                            title="Baixar Anexo"
-                          >
-                            <Paperclip className="w-3.5 h-3.5" />
-                            <span className="truncate max-w-[150px]">{r.nomeAnexo}</span>
-                            <Download className="w-3 h-3 text-sky-400 flex-shrink-0" />
-                          </a>
-                        ) : (
-                          <span className="text-[10px] text-slate-500 italic">Nenhum laudo digital anexado</span>
-                        )}
-
-                        <button
-                          onClick={() => handleDeleteRevisao(r.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors border-0"
-                          title="Excluir Registro"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Modal de Cadastrar Revisão ou Laudo */}
-            {isRevFormOpen && (
-              <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 overflow-y-auto flex justify-center items-start p-4 sm:p-6 md:py-10">
-                <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-slate-700 overflow-hidden flex flex-col my-auto">
-                  <div className="bg-slate-800 px-5 py-4 text-white border-b border-slate-700 flex justify-between items-center flex-shrink-0">
-                    <h3 className="font-display font-semibold text-sm">Registrar Revisão e Anexar Laudo Físico</h3>
-                    <button
-                      onClick={() => setIsRevFormOpen(false)}
-                      className="text-slate-400 hover:text-white transition-colors text-xs p-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <form onSubmit={handleAddRevisao} className="p-5 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2 sm:col-span-1">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Componente Alvo</label>
-                        <select
-                          value={revComponenteId}
-                          onChange={(e) => setRevComponenteId(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        >
-                          <option value="" className="bg-slate-900">-- Aeronave Geral (Geral ou Célula) --</option>
-                          {componentes.map(comp => (
-                            <option key={comp.id} value={comp.id} className="bg-slate-900">Peça: {comp.nome} (P/N: {comp.partNumber || 'ND'})</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="col-span-2 sm:col-span-1">
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Tipo de Manutenção *</label>
-                        <select
-                          required
-                          value={revTipo}
-                          onChange={(e) => setRevTipo(e.target.value as any)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        >
-                          <option value="periodica" className="bg-slate-900">Periódica / Preventiva Requerida</option>
-                          <option value="preventiva" className="bg-slate-900">Inspeção Preventiva Opcional</option>
-                          <option value="corretiva" className="bg-slate-900">Manutenção Corretiva (Substituição de Peça)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">Data da Execução *</label>
-                        <input
-                          type="date"
-                          required
-                          value={revData}
-                          onChange={(e) => setRevData(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 mb-1">H.V. da Aeronave na Revisão *</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          required
-                          value={revHoras}
-                          onChange={(e) => setRevHoras(Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 mb-1">Laudo Descritivo / Serviços Executados *</label>
-                      <textarea
-                        required
-                        value={revDescricao}
-                        onChange={(e) => setRevDescricao(e.target.value)}
-                        placeholder="Descreva detalhadamente o serviço realizado. Ex: Efetuado abertura do magneto, limpeza de platinados, aferição e re-torque com troca da gaxeta de vedação..."
-                        rows={3}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-650"
-                      ></textarea>
-                    </div>
-
-                    {/* upload area */}
-                    <div className="space-y-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Anexar Laudo Técnico ou Recibo de Peça (PDF ou Imagem)</label>
-                      <div className="border border-dashed border-slate-705 rounded-xl p-4 bg-slate-955/20 text-center relative hover:bg-slate-950/40 transition-colors">
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={handleFileChange}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                        <div className="space-y-1">
-                          <Upload className="w-5 h-5 text-slate-500 mx-auto" />
-                          <p className="text-[11px] text-slate-300">
-                            {attachmentName ? (
-                              <strong className="text-slate-100 flex items-center justify-center gap-1">
-                                <Paperclip className="w-3 h-3 text-sky-400" />
-                                {attachmentName} (Alterar)
-                              </strong>
-                            ) : (
-                              'Clique ou arraste o arquivo aqui para fazer o upload'
-                            )}
-                          </p>
-                          <p className="text-[9px] text-slate-500">Tamanho máximo recomendado: 15MB</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsRevFormOpen(false)}
-                        className="px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2.5 text-xs font-medium text-white bg-sky-500 hover:bg-sky-655 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-500/10"
-                      >
-                        Salvar laudo de Revisão
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-          </div>
+          )
         )}
       </div>
     </div>

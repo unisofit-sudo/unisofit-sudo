@@ -56,6 +56,9 @@ export interface ComponenteControlado {
   ultimaRevisaoHoras: number; // Horas de voo da aeronave na última revisão
   ultimaRevisaoData: string;  // Data da última revisão: YYYY-MM-DD
   
+  nomeAnexo?: string; // Nome do documento/imagem anexo
+  dadosAnexo?: string; // Conteúdo base64 do documento/imagem anexo
+
   created_at?: string;
 }
 

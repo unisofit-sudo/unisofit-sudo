@@ -801,7 +801,7 @@ export default function AeronaveDetail({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">H.V. da Aeronave na Instalação *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Horas Totais da Aeronave *</label>
                     <input
                       type="number"
                       step="0.1"
@@ -830,7 +830,7 @@ export default function AeronaveDetail({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">H.V. Aeronave na Última Revisão *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Horas Totais do Componente *</label>
                     <input
                       type="number"
                       step="0.1"

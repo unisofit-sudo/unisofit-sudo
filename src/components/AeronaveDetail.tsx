@@ -32,12 +32,14 @@ interface AeronaveDetailProps {
   aeronave: Aeronave;
   cliente: Cliente;
   onRefreshAeronave: () => void;
+  userRole?: 'admin' | 'cliente' | 'oficina' | null;
 }
 
 export default function AeronaveDetail({
   aeronave,
   cliente,
-  onRefreshAeronave
+  onRefreshAeronave,
+  userRole
 }: AeronaveDetailProps) {
   const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'voos' | 'laudos'>('mapa');
   
@@ -69,6 +71,16 @@ export default function AeronaveDetail({
   const [compUltimaRevisaoData, setCompUltimaRevisaoData] = useState(new Date().toISOString().split('T')[0]);
   const [compAttachmentName, setCompAttachmentName] = useState('');
   const [compAttachmentData, setCompAttachmentData] = useState('');
+  const [compMarca, setCompMarca] = useState('');
+  const [compCondicao, setCompCondicao] = useState<'novo' | 'overhaul'>('novo');
+
+  // Mantém a Data da Última Revisão igual à Data da Instalação se for componente "Novo"
+  useEffect(() => {
+    if (compCondicao === 'novo') {
+      setCompUltimaRevisaoData(compDataInstalacao);
+      setCompUltimaRevisaoHoras(compHorasInstalacao);
+    }
+  }, [compCondicao, compDataInstalacao, compHorasInstalacao]);
 
   // Formulário: Nova Revisão / Carga de Laudo
   const [isRevFormOpen, setIsRevFormOpen] = useState(false);
@@ -175,7 +187,9 @@ export default function AeronaveDetail({
       ultimaRevisaoHoras: Number(compUltimaRevisaoHoras || 0),
       ultimaRevisaoData: compUltimaRevisaoData,
       nomeAnexo: compAttachmentName || undefined,
-      dadosAnexo: compAttachmentData || undefined
+      dadosAnexo: compAttachmentData || undefined,
+      marca: compMarca.trim() || undefined,
+      condicao: compCondicao
     };
 
     try {
@@ -199,8 +213,8 @@ export default function AeronaveDetail({
   const handleEditComponente = (c: ComponenteControlado) => {
     setCompEditing(c);
     setCompNome(c.nome);
-    setCompPartNumber(c.partNumber);
-    setCompSerialNumber(c.serialNumber);
+    setCompPartNumber(c.partNumber || '');
+    setCompSerialNumber(c.serialNumber || '');
     setCompLimiteHoras(c.limiteHoras);
     setCompLimiteDias(c.limiteDias);
     setCompHorasInstalacao(c.horasInstalacao);
@@ -209,6 +223,8 @@ export default function AeronaveDetail({
     setCompUltimaRevisaoData(c.ultimaRevisaoData);
     setCompAttachmentName(c.nomeAnexo || '');
     setCompAttachmentData(c.dadosAnexo || '');
+    setCompMarca(c.marca || '');
+    setCompCondicao(c.condicao || 'novo');
     setIsCompFormOpen(true);
   };
 
@@ -271,6 +287,8 @@ export default function AeronaveDetail({
     setCompUltimaRevisaoData(new Date().toISOString().split('T')[0]);
     setCompAttachmentName('');
     setCompAttachmentData('');
+    setCompMarca('');
+    setCompCondicao('novo');
     setIsCompFormOpen(true);
   };
 
@@ -667,8 +685,8 @@ export default function AeronaveDetail({
               </div>
 
               <form onSubmit={handleSaveComponente} className="space-y-6">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                  <div className="sm:col-span-3">
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome do Componente ou Peça *</label>
                     <input
                       type="text"
@@ -680,6 +698,16 @@ export default function AeronaveDetail({
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Marca / Fabricante</label>
+                    <input
+                      type="text"
+                      value={compMarca}
+                      onChange={(e) => setCompMarca(e.target.value)}
+                      placeholder="Ex: Lycoming, Champion"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                    />
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Part Number (P/N)</label>
                     <input
@@ -699,6 +727,36 @@ export default function AeronaveDetail({
                       placeholder="Ex: SN-54231-G"
                       className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-400">Condição de Entrada do Componente *</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setCompCondicao('novo')}
+                      className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        compCondicao === 'novo'
+                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/5'
+                          : 'bg-slate-1000 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full border-2 ${compCondicao === 'novo' ? 'border-emerald-400 bg-emerald-400' : 'border-slate-600'}`}></span>
+                      Novo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCompCondicao('overhaul')}
+                      className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        compCondicao === 'overhaul'
+                          ? 'bg-purple-500/10 border-purple-500 text-purple-400 shadow-lg shadow-purple-500/5'
+                          : 'bg-slate-1000 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full border-2 ${compCondicao === 'overhaul' ? 'border-purple-400 bg-purple-400' : 'border-slate-600'}`}></span>
+                      Overhauled
+                    </button>
                   </div>
                 </div>
 
@@ -755,13 +813,20 @@ export default function AeronaveDetail({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data Última Revisão *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                      Data Última Revisão * {compCondicao === 'novo' && <span className="text-[10px] text-emerald-400 italic">(Igual à Instalação para Novo)</span>}
+                    </label>
                     <input
                       type="date"
                       required
+                      disabled={compCondicao === 'novo'}
                       value={compUltimaRevisaoData}
                       onChange={(e) => setCompUltimaRevisaoData(e.target.value)}
-                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                      className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none text-slate-100 transition-colors ${
+                        compCondicao === 'novo'
+                          ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                          : 'bg-slate-1000 border-slate-700 focus:border-sky-500'
+                      }`}
                     />
                   </div>
                   <div>
@@ -827,13 +892,15 @@ export default function AeronaveDetail({
                   <h3 className="text-base font-display font-bold text-white tracking-tight">Componentes e Peças Controladas</h3>
                   <p className="text-xs text-slate-400">Cadastre as peças que possuem desgaste por horas de voo ou tempo limite.</p>
                 </div>
-                <button
-                  onClick={openNovoComponente}
-                  className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-                >
-                  <Plus className="w-4 h-4" />
-                  Cadastrar Componente
-                </button>
+                {userRole !== 'oficina' && (
+                  <button
+                    onClick={openNovoComponente}
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Cadastrar Componente
+                  </button>
+                )}
               </div>
 
               {componentes.length === 0 ? (
@@ -860,11 +927,20 @@ export default function AeronaveDetail({
                           <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
                             <td className="p-4 font-semibold text-white">
                               <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
                                     alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
                                   }`} title={`Status: ${alerta.status}`}></span>
                                   <span>{c.nome}</span>
+                                  {c.condicao && (
+                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                      c.condicao === 'novo'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                    }`}>
+                                      {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
+                                    </span>
+                                  )}
                                 </div>
                                 {c.nomeAnexo && c.dadosAnexo && (
                                   <a
@@ -873,7 +949,7 @@ export default function AeronaveDetail({
                                     className="flex items-center gap-1 text-[10px] text-sky-400 font-medium hover:text-sky-350 transition-colors w-fit pl-5 mt-0.5"
                                     title="Baixar Anexo do Componente"
                                   >
-                                    <Paperclip className="w-3 h-3 flex-shrink-0" />
+                                    <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
                                     <span className="truncate max-w-[150px]">{c.nomeAnexo}</span>
                                     <Download className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
                                   </a>
@@ -881,9 +957,16 @@ export default function AeronaveDetail({
                               </div>
                             </td>
                             <td className="p-4">
-                              <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
-                                <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
-                                <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
+                              <div className="space-y-1">
+                                {c.marca && (
+                                  <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">
+                                    {c.marca}
+                                  </div>
+                                )}
+                                <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
+                                  <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
+                                  <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
+                                </div>
                               </div>
                             </td>
                             <td className="p-4 font-semibold text-slate-200">
@@ -914,20 +997,24 @@ export default function AeronaveDetail({
                                 >
                                   <Upload className="w-3.5 h-3.5" />
                                 </button>
-                                <button
-                                  onClick={() => handleEditComponente(c)}
-                                  className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                  title="Editar"
-                                >
-                                  <History className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteComponente(c.id)}
-                                  className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                  title="Excluir"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                {userRole !== 'oficina' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditComponente(c)}
+                                      className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                      title="Editar"
+                                    >
+                                      <History className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteComponente(c.id)}
+                                      className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1035,16 +1122,18 @@ export default function AeronaveDetail({
                   <h3 className="text-base font-display font-bold text-white tracking-tight">Diário de Bordo / Histórico de Voos</h3>
                   <p className="text-xs text-slate-400">Registre os voos efetuados. As horas são automaticamente integradas ao contador geral para calcular os alertas de manutenção.</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setVooData(new Date().toISOString().split('T')[0]);
-                    setIsVooFormOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
-                >
-                  <Plus className="w-4 h-4" />
-                  Registrar Novo Voo
-                </button>
+                {userRole !== 'oficina' && (
+                  <button
+                    onClick={() => {
+                      setVooData(new Date().toISOString().split('T')[0]);
+                      setIsVooFormOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Registrar Novo Voo
+                  </button>
+                )}
               </div>
 
               {voos.length === 0 ? (
@@ -1081,13 +1170,15 @@ export default function AeronaveDetail({
                           <td className="p-4 font-black text-sky-400 text-[13px] font-mono">{v.horasVoo.toFixed(1)} hs</td>
                           <td className="p-4 text-slate-400 font-medium italic">{v.descricao || '-'}</td>
                           <td className="p-4 text-right">
-                            <button
-                              onClick={() => handleDeleteVoo(v.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
-                              title="Excluir Diário"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {userRole !== 'oficina' && (
+                              <button
+                                onClick={() => handleDeleteVoo(v.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
+                                title="Excluir Diário"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1307,13 +1398,15 @@ export default function AeronaveDetail({
                             <span className="text-[10px] text-slate-500 italic">Nenhum laudo digital anexado</span>
                           )}
 
-                          <button
-                            onClick={() => handleDeleteRevisao(r.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors border-0"
-                            title="Excluir Registro"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {userRole !== 'oficina' && (
+                            <button
+                              onClick={() => handleDeleteRevisao(r.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors border-0"
+                              title="Excluir Registro"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

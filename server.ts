@@ -23,7 +23,12 @@ import {
   addRevisao,
   deleteRevisao,
   getDbConnectionStatus,
-  reconfigureAndInitDb
+  reconfigureAndInitDb,
+  getUsuariosOficina,
+  getUsuarioOficinaByEmail,
+  addUsuarioOficina,
+  updateUsuarioOficina,
+  deleteUsuarioOficina
 } from './src/server/db.js';
 
 async function startServer() {
@@ -74,14 +79,14 @@ async function startServer() {
     const cleanEmail = String(email).trim().toLowerCase();
 
     // 1. Verifica se é administrador
-    if (cleanEmail === 'lucastrombeta@gmail.com' && password === 'admin123') {
+    if (cleanEmail === 'lucas.trombeta@unisofit.com.br' && password === 'Unis0fit2011@') {
       return res.json({
         success: true,
         role: 'admin',
         user: {
           id: 'admin',
           nome: 'Lucas Trombeta (Admin)',
-          email: 'lucastrombeta@gmail.com',
+          email: 'lucas.trombeta@unisofit.com.br',
           documento: 'Administrador'
         }
       });
@@ -99,6 +104,35 @@ async function startServer() {
           success: true,
           role: 'cliente',
           user: matchedClient
+        });
+      }
+
+      // 3. Busca na base de usuários de oficina (acesso à documentação)
+      const oficinaUser = await getUsuarioOficinaByEmail(cleanEmail);
+      if (oficinaUser && oficinaUser.senha === password) {
+        // Verificar prazo de acesso
+        if (oficinaUser.tipoPrazo === 'determinado' && oficinaUser.prazoAcesso) {
+          const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+          if (oficinaUser.prazoAcesso < today) {
+            return res.status(403).json({ success: false, error: `Acesso expirado! O período concedido para este usuário terminou em ${oficinaUser.prazoAcesso.split('-').reverse().join('/')}.` });
+          }
+        }
+
+        // Buscar dados do cliente proprietário para que o frontend carregue suas aeronaves normalmente
+        const ownerClient = clientes.find(c => c.id === oficinaUser.clienteId);
+        if (!ownerClient) {
+          return res.status(404).json({ success: false, error: 'Cliente proprietário associado a este acesso não encontrado.' });
+        }
+
+        return res.json({
+          success: true,
+          role: 'oficina',
+          user: ownerClient,
+          oficinaUser: {
+            id: oficinaUser.id,
+            nome: oficinaUser.nome,
+            email: oficinaUser.email
+          }
         });
       }
 
@@ -142,6 +176,56 @@ async function startServer() {
   app.delete('/api/clientes/:id', async (req, res) => {
     try {
       await deleteCliente(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- USUÁRIOS DE OFICINA ---
+  app.get('/api/usuarios-oficina', async (req, res) => {
+    try {
+      const { clienteId } = req.query;
+      if (!clienteId) {
+        return res.status(400).json({ error: 'O ID do cliente (clienteId) é obrigatório.' });
+      }
+      const list = await getUsuariosOficina(String(clienteId));
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/usuarios-oficina', async (req, res) => {
+    try {
+      const user = req.body;
+      if (!user.id) user.id = 'ofi_' + Math.random().toString(36).substr(2, 9);
+      if (!user.clienteId) {
+        return res.status(400).json({ error: 'O ID do cliente (clienteId) é obrigatório.' });
+      }
+      const created = await addUsuarioOficina(user);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/usuarios-oficina', async (req, res) => {
+    try {
+      const user = req.body;
+      if (!user.id) {
+        return res.status(400).json({ error: 'O ID do usuário é obrigatório.' });
+      }
+      const updated = await updateUsuarioOficina(user);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/usuarios-oficina/:id', async (req, res) => {
+    try {
+      await deleteUsuarioOficina(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -16,6 +16,17 @@ export interface Cliente {
   created_at?: string;
 }
 
+export interface UsuarioOficina {
+  id: string;
+  clienteId: string;
+  nome: string;
+  email: string;
+  senha: string;
+  tipoPrazo: 'indeterminado' | 'determinado';
+  prazoAcesso?: string; // YYYY-MM-DD
+  created_at?: string;
+}
+
 export interface Aeronave {
   id: string;
   matricula: string; // Prefixo, ex: PT-XYZ
@@ -58,6 +69,9 @@ export interface ComponenteControlado {
   
   nomeAnexo?: string; // Nome do documento/imagem anexo
   dadosAnexo?: string; // Conteúdo base64 do documento/imagem anexo
+
+  marca?: string; // Marca / Fabricante do componente
+  condicao?: 'novo' | 'overhaul'; // Condição do componente: novo ou overhaul
 
   created_at?: string;
 }

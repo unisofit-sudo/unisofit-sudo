@@ -8,6 +8,7 @@ import { Cliente, Aeronave, DashboardStats } from './types';
 import ClientesList from './components/ClientesList';
 import AeronavesList from './components/AeronavesList';
 import AeronaveDetail from './components/AeronaveDetail';
+import loggyLogo from './assets/images/loggy_logo_1783944292576.jpg';
 import { 
   Plane, 
   Users, 
@@ -32,8 +33,8 @@ export default function App() {
   const [selectedAeronave, setSelectedAeronave] = useState<Aeronave | null>(null);
   
   // Controle de Autenticação
-  const [userRole, setUserRole] = useState<'admin' | 'cliente' | null>(() => {
-    return (localStorage.getItem('aeromanut_userRole') as 'admin' | 'cliente' | null) || null;
+  const [userRole, setUserRole] = useState<'admin' | 'cliente' | 'oficina' | null>(() => {
+    return (localStorage.getItem('aeromanut_userRole') as 'admin' | 'cliente' | 'oficina' | null) || null;
   });
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('aeromanut_currentUser');
@@ -63,7 +64,7 @@ export default function App() {
 
   // Efeito para garantir que o cliente logado esteja sempre pré-selecionado
   useEffect(() => {
-    if (userRole === 'cliente' && currentUser) {
+    if ((userRole === 'cliente' || userRole === 'oficina') && currentUser) {
       setSelectedCliente(currentUser);
     }
   }, [userRole, currentUser]);
@@ -90,7 +91,7 @@ export default function App() {
         localStorage.setItem('aeromanut_userRole', data.role);
         localStorage.setItem('aeromanut_currentUser', JSON.stringify(data.user));
         
-        if (data.role === 'cliente') {
+        if (data.role === 'cliente' || data.role === 'oficina') {
           setSelectedCliente(data.user);
         } else {
           setSelectedCliente(null);
@@ -211,10 +212,10 @@ export default function App() {
       setClientes(clientList);
       setAeronaves(aeroList);
 
-      // Se for cliente, sincroniza as informações atualizadas do próprio perfil do banco de dados
+      // Se for cliente ou oficina, sincroniza as informações atualizadas do próprio perfil do banco de dados
       const cachedRole = localStorage.getItem('aeromanut_userRole');
       const cachedUser = localStorage.getItem('aeromanut_currentUser');
-      if (cachedRole === 'cliente' && cachedUser) {
+      if ((cachedRole === 'cliente' || cachedRole === 'oficina') && cachedUser) {
         const uObj = JSON.parse(cachedUser);
         const latestInfo = clientList.find((c: any) => c.id === uObj.id);
         if (latestInfo) {
@@ -359,23 +360,23 @@ export default function App() {
   // Se não estiver autenticado, renderiza a tela de login primeiro
   if (!userRole) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#09101f] to-[#040812] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
         {/* Glow Effects */}
-        <div className="absolute top-1/4 left-1/3 -translate-y-1/2 w-[450px] h-[450px] bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/3 w-[350px] h-[350px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/4 left-1/3 -translate-y-1/2 w-[450px] h-[450px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/3 w-[350px] h-[350px] bg-sky-500/5 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="my-auto max-w-md w-full text-center space-y-6 relative z-10">
           <div className="flex flex-col items-center">
-            <div className="h-16 w-16 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-sky-500/15 mb-4 border border-sky-400/20">
-              <Plane className="w-8 h-8 rotate-45" />
+            <div className="h-20 w-20 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/10 mb-4 border border-blue-400/20 bg-slate-900 flex items-center justify-center">
+              <img src={loggyLogo} alt="Loggy Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
-            <h1 className="font-display font-extrabold text-white tracking-tight text-3xl">
-              AERO<span className="text-sky-400">MANUT</span>
+            <h1 className="font-display font-black text-white tracking-wider text-4xl">
+              LOGGY
             </h1>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-1.5">Controle de Manutenção Aeronáutica</p>
+            <p className="text-xs text-blue-400 font-bold uppercase tracking-[0.2em] mt-1.5">Descomplicando.....</p>
           </div>
 
-          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 text-left space-y-5 shadow-2xl">
+          <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 sm:p-8 text-left space-y-5 shadow-2xl">
             <div className="border-b border-slate-800/60 pb-3">
               <h2 className="font-display font-bold text-white text-lg">Área de Acesso</h2>
               <p className="text-xs text-slate-400 mt-1">Insira suas credenciais para gerenciar a frota</p>
@@ -392,7 +393,7 @@ export default function App() {
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="Ex: seuemail@provedor.com"
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-600"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-600"
                     disabled={isLoggingIn}
                   />
                 </div>
@@ -408,7 +409,7 @@ export default function App() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Sua senha de acesso"
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-200 placeholder-slate-600"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-600"
                     disabled={isLoggingIn}
                   />
                 </div>
@@ -424,7 +425,7 @@ export default function App() {
               <button
                 type="submit"
                 disabled={isLoggingIn}
-                className="w-full py-3 px-4 bg-sky-500 hover:bg-sky-605 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-sky-500/10 active:scale-[0.98]"
+                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 active:scale-[0.98]"
               >
                 {isLoggingIn ? (
                   <>
@@ -436,28 +437,11 @@ export default function App() {
                 )}
               </button>
             </form>
-
-            <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
-              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest block font-sans">Dicas de Acesso Rápido:</span>
-              <div className="bg-slate-950/70 border border-slate-850 rounded-xl p-3 text-[11px] text-slate-400 space-y-1.5 font-mono">
-                <div>
-                  <span className="text-sky-400 font-semibold block">Acesso Administrador:</span>
-                  <div className="text-[10px] text-slate-350 mt-0.5">E-mail: <span className="text-white">lucastrombeta@gmail.com</span></div>
-                  <div className="text-[10px] text-slate-350">Senha: <span className="text-white">admin123</span></div>
-                </div>
-                <div className="border-t border-slate-900 pt-1.5">
-                  <span className="text-emerald-400 font-semibold block">Acesso do Cliente:</span>
-                  <p className="text-[10px] leading-relaxed text-slate-400 mt-0.5 font-sans">
-                    Use o e-mail e a senha cadastrados lá no registro de clientes para o cliente acessar seu perfil aeronáutico próprio de forma restrita.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
         <div className="w-full text-center text-[10px] text-slate-600">
-          AeroManut • Acesso Restrito • {new Date().getFullYear()}
+          Loggy • Descomplicando..... • {new Date().getFullYear()}
         </div>
       </div>
     );
@@ -465,10 +449,10 @@ export default function App() {
 
   if (!dbStatus.connected) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#09101f] to-[#040812] text-slate-100 flex flex-col justify-between items-center p-6 relative font-sans overflow-hidden">
         {/* Glow Effects */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-500/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-10 left-10 w-[250px] h-[250px] bg-sky-500/5 rounded-full blur-[80px] pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-[250px] h-[250px] bg-blue-500/5 rounded-full blur-[80px] pointer-events-none" />
 
         <div className="my-auto max-w-xl w-full text-center space-y-8 relative z-10">
           <div className="flex flex-col items-center">
@@ -495,7 +479,7 @@ export default function App() {
 
           <div className="bg-slate-900/85 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 text-left space-y-4 shadow-xl">
             <p className="text-slate-300 text-sm leading-relaxed">
-              O aplicativo <strong className="text-white">AeroManut</strong> está configurado em modo estrito de produção para VPS. O sistema requer uma conexão ativa com o banco de dados PostgreSQL antes de inicializar o painel, não sendo permitido conexões ou armazenamentos locais temporários.
+              O aplicativo <strong className="text-white">Loggy</strong> está configurado em modo estrito de produção para VPS. O sistema requer uma conexão ativa com o banco de dados PostgreSQL antes de inicializar o painel, não sendo permitido conexões ou armazenamentos locais temporários.
             </p>
 
             <div className="space-y-1.5 pt-2 border-t border-slate-800">
@@ -697,33 +681,33 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col font-sans" id="main-app">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans" id="main-app">
       {/* Navbar Superior do Sistema */}
-      <header className="bg-slate-800/50 border-b border-slate-700/80 sticky top-0 z-40 px-6 py-4 backdrop-blur-md" id="app-header">
+      <header className="bg-slate-900/80 border-b border-blue-900/30 sticky top-0 z-40 px-6 py-4 backdrop-blur-md shadow-lg" id="app-header">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between sm:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-sky-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/15">
-              <Plane className="w-5 h-5 rotate-45" />
+            <div className="h-11 w-11 rounded-xl overflow-hidden border border-blue-500/30 shadow-md">
+              <img src={loggyLogo} alt="Loggy Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div>
-              <h1 className="font-display font-extrabold text-white tracking-tight text-xl leading-tight">
-                AERO<span className="text-sky-400">MANUT</span>
+              <h1 className="font-display font-black text-white tracking-wider text-2xl leading-none">
+                LOGGY
               </h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Controle de Manutenção Aeronáutica</p>
+              <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mt-1">Descomplicando.....</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-700/30 sm:border-transparent">
+          <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-750 sm:border-transparent">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 bg-slate-700/60 rounded-lg flex items-center justify-center border border-slate-600/30">
-                <User className="w-4 h-4 text-sky-400" />
+              <div className="h-8 w-8 bg-slate-800/60 rounded-lg flex items-center justify-center border border-slate-700/30">
+                <User className="w-4 h-4 text-blue-400" />
               </div>
               <div className="text-left">
                 <div className="text-[11px] font-bold text-slate-200">
                   {currentUser?.nome || 'Usuário'}
                 </div>
-                <div className="text-[9px] text-sky-400 font-semibold tracking-wider uppercase font-mono">
-                  {userRole === 'admin' ? 'Administrador' : 'Acesso Cliente'}
+                <div className="text-[9px] text-blue-400 font-semibold tracking-wider uppercase font-mono">
+                  {userRole === 'admin' ? 'Administrador' : userRole === 'oficina' ? 'Acesso Oficina / Doc' : 'Acesso Cliente'}
                 </div>
               </div>
             </div>
@@ -747,16 +731,17 @@ export default function App() {
           <div className="space-y-4 animate-fade-in">
             <button
               onClick={() => setSelectedAeronave(null)}
-              className="inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-sky-400 bg-slate-800/50 border border-slate-700/50 px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md hover:border-slate-600/50"
+              className="inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-blue-400 bg-slate-900/50 border border-slate-800/50 px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md hover:border-slate-700/50"
               id="btn-voltar-frota"
             >
-              <ArrowLeft className="w-4 h-4 text-sky-400" />
+              <ArrowLeft className="w-4 h-4 text-blue-400" />
               Voltar para a Frota de Aeronaves
             </button>
             <AeronaveDetail
               aeronave={selectedAeronave}
               cliente={selectedCliente!}
               onRefreshAeronave={handleRefreshAeronave}
+              userRole={userRole}
             />
           </div>
         ) : (
@@ -764,15 +749,15 @@ export default function App() {
           <div className="space-y-6">
             
             {/* Informações Auxiliares */}
-            <div className="bg-slate-800/45 border border-slate-700/50 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-4 text-xs shadow-lg">
-              <div className="p-3 bg-sky-500/10 text-sky-400 rounded-xl flex-shrink-0 border border-sky-500/15">
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-4 text-xs shadow-lg">
+              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl flex-shrink-0 border border-blue-500/15">
                 <Info className="w-5 h-5" />
               </div>
               <div className="space-y-1">
                 <h4 className="font-display font-bold text-white text-sm">Como funciona o controle de manutenção por horas de voo?</h4>
                 <p className="text-slate-300 leading-relaxed">
                   Cadastre o cliente e suas respectivas aeronaves. Nas aeronaves, adicione componentes controlados (instalação e limites de horas/dias). 
-                  Toda vez que um voo for adicionado no <strong className="text-sky-400 font-semibold">Diário de Bordo</strong> da aeronave, seu tempo total é atualizado e o sistema recalcula 
+                  Toda vez que um voo for adicionado no <strong className="text-blue-400 font-semibold">Diário de Bordo</strong> da aeronave, seu tempo total é atualizado e o sistema recalcula 
                   automaticamente o mapa de alertas e vencimentos de inspeção, sinalizando os gargalos de revisão com antecedência.
                 </p>
               </div>
@@ -817,9 +802,9 @@ export default function App() {
       </main>
 
       {/* Rodapé do Sistema */}
-      <footer className="bg-slate-950/75 border-t border-slate-900 mt-12 py-6 px-6 text-xs text-center text-slate-500" id="app-footer">
+      <footer className="bg-slate-950 border-t border-slate-900 mt-12 py-6 px-6 text-xs text-center text-slate-500" id="app-footer">
         <div className="max-w-7xl mx-auto">
-          <p>© {new Date().getFullYear()} AeroManut - Sistema de Controle de Manutenção Aeronáutica.</p>
+          <p>© {new Date().getFullYear()} Loggy - Descomplicando..... • Sistema de Controle de Manutenção Aeronáutica.</p>
         </div>
       </footer>
     </div>

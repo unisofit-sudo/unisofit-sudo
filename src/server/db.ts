@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, RevisaoLaudo } from '../types';
+import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, RevisaoLaudo, UsuarioOficina } from '../types';
 
 let pool: Pool | null = null;
 let dbConnectionError: string | null = null;
@@ -215,6 +215,8 @@ export async function initDb() {
           ultima_revisao_data VARCHAR(20),
           nome_anexo VARCHAR(255),
           dados_anexo TEXT,
+          marca VARCHAR(255),
+          condicao VARCHAR(50),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_comp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
@@ -222,6 +224,8 @@ export async function initDb() {
         -- Garante suporte a evolução do schema caso a tabela já exista
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS nome_anexo VARCHAR(255);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS dados_anexo TEXT;
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS marca VARCHAR(255);
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS condicao VARCHAR(50);
         
         CREATE TABLE IF NOT EXISTS revisoes (
           id VARCHAR(100) PRIMARY KEY,
@@ -236,6 +240,18 @@ export async function initDb() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_rev FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE,
           CONSTRAINT fk_componente_rev FOREIGN KEY (componente_id) REFERENCES componentes(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS usuarios_oficina (
+          id VARCHAR(100) PRIMARY KEY,
+          cliente_id VARCHAR(100) NOT NULL,
+          nome VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          senha VARCHAR(255) NOT NULL,
+          tipo_prazo VARCHAR(50) DEFAULT 'indeterminado',
+          prazo_acesso VARCHAR(20),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_cliente_oficina FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
         );
       `);
       console.log('Tabelas PostgreSQL inicializadas com sucesso.');
@@ -498,6 +514,8 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       ultimaRevisaoData: row.ultima_revisao_data,
       nomeAnexo: row.nome_anexo || undefined,
       dadosAnexo: row.dados_anexo || undefined,
+      marca: row.marca || undefined,
+      condicao: (row.condicao as 'novo' | 'overhaul') || undefined,
       created_at: row.created_at
     }));
   } catch (err: any) {
@@ -509,11 +527,11 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao } = comp;
     await p.query(
-      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null]
+      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null]
     );
     return comp;
   } catch (err: any) {
@@ -525,10 +543,10 @@ export async function addComponente(comp: ComponenteControlado): Promise<Compone
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao } = comp;
     await p.query(
-      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12 WHERE id = $13`,
-      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, id]
+      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12, marca = $13, condicao = $14 WHERE id = $15`,
+      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, id]
     );
     return comp;
   } catch (err: any) {
@@ -608,6 +626,89 @@ export async function deleteRevisao(id: string): Promise<void> {
     await p.query('DELETE FROM revisoes WHERE id = $1', [id]);
   } catch (err: any) {
     setDbConnectionError('Erro ao deletar revisão: ' + err.message);
+    throw err;
+  }
+}
+
+// GERENCIAMENTO DE USUÁRIOS DE OFICINA (ACESSO À DOCUMENTAÇÃO)
+export async function getUsuariosOficina(clienteId: string): Promise<UsuarioOficina[]> {
+  try {
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM usuarios_oficina WHERE cliente_id = $1 ORDER BY nome ASC', [clienteId]);
+    return res.rows.map(row => ({
+      id: row.id,
+      clienteId: row.cliente_id,
+      nome: row.nome,
+      email: row.email,
+      senha: row.senha,
+      tipoPrazo: row.tipo_prazo as 'indeterminado' | 'determinado',
+      prazoAcesso: row.prazo_acesso || undefined,
+      created_at: row.created_at
+    }));
+  } catch (err: any) {
+    setDbConnectionError('Erro ao consultar usuários de oficina: ' + err.message);
+    throw err;
+  }
+}
+
+export async function getUsuarioOficinaByEmail(email: string): Promise<UsuarioOficina | null> {
+  try {
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM usuarios_oficina WHERE LOWER(email) = $1', [email.toLowerCase().trim()]);
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      clienteId: row.cliente_id,
+      nome: row.nome,
+      email: row.email,
+      senha: row.senha,
+      tipoPrazo: row.tipo_prazo as 'indeterminado' | 'determinado',
+      prazoAcesso: row.prazo_acesso || undefined,
+      created_at: row.created_at
+    };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao buscar usuário de oficina por e-mail: ' + err.message);
+    throw err;
+  }
+}
+
+export async function addUsuarioOficina(usuario: UsuarioOficina): Promise<UsuarioOficina> {
+  try {
+    const p = checkPool();
+    const { id, clienteId, nome, email, senha, tipoPrazo, prazoAcesso } = usuario;
+    await p.query(
+      'INSERT INTO usuarios_oficina (id, cliente_id, nome, email, senha, tipo_prazo, prazo_acesso) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, clienteId, nome, email.toLowerCase().trim(), senha, tipoPrazo, prazoAcesso || null]
+    );
+    return usuario;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar usuário de oficina: ' + err.message);
+    throw err;
+  }
+}
+
+export async function updateUsuarioOficina(usuario: UsuarioOficina): Promise<UsuarioOficina> {
+  try {
+    const p = checkPool();
+    const { id, nome, email, senha, tipoPrazo, prazoAcesso } = usuario;
+    await p.query(
+      'UPDATE usuarios_oficina SET nome = $1, email = $2, senha = $3, tipo_prazo = $4, prazo_acesso = $5 WHERE id = $6',
+      [nome, email.toLowerCase().trim(), senha, tipoPrazo, prazoAcesso || null, id]
+    );
+    return usuario;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar usuário de oficina: ' + err.message);
+    throw err;
+  }
+}
+
+export async function deleteUsuarioOficina(id: string): Promise<void> {
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM usuarios_oficina WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar usuário de oficina: ' + err.message);
     throw err;
   }
 }

@@ -72,6 +72,7 @@ export default function AeronaveDetail({
   const [compAttachmentName, setCompAttachmentName] = useState('');
   const [compAttachmentData, setCompAttachmentData] = useState('');
   const [compMarca, setCompMarca] = useState('');
+  const [compOficinaExecutante, setCompOficinaExecutante] = useState('');
   const [compCondicao, setCompCondicao] = useState<'novo' | 'overhaul'>('novo');
 
   // Mantém a Data da Última Revisão igual à Data da Instalação se for componente "Novo"
@@ -189,7 +190,8 @@ export default function AeronaveDetail({
       nomeAnexo: compAttachmentName || undefined,
       dadosAnexo: compAttachmentData || undefined,
       marca: compMarca.trim() || undefined,
-      condicao: compCondicao
+      condicao: compCondicao,
+      oficinaExecutante: compOficinaExecutante.trim() || undefined
     };
 
     try {
@@ -224,6 +226,7 @@ export default function AeronaveDetail({
     setCompAttachmentName(c.nomeAnexo || '');
     setCompAttachmentData(c.dadosAnexo || '');
     setCompMarca(c.marca || '');
+    setCompOficinaExecutante(c.oficinaExecutante || '');
     setCompCondicao(c.condicao || 'novo');
     setIsCompFormOpen(true);
   };
@@ -288,6 +291,7 @@ export default function AeronaveDetail({
     setCompAttachmentName('');
     setCompAttachmentData('');
     setCompMarca('');
+    setCompOficinaExecutante('');
     setCompCondicao('novo');
     setIsCompFormOpen(true);
   };
@@ -563,6 +567,9 @@ export default function AeronaveDetail({
                             <p className="text-[10px] text-slate-400 mt-1.5">
                               P/N: <strong className="text-slate-200">{compOriginal.partNumber || 'N/D'}</strong> • 
                               S/N: <strong className="text-slate-200">{compOriginal.serialNumber || 'N/D'}</strong>
+                              {compOriginal.oficinaExecutante && (
+                                <> • Oficina: <strong className="text-emerald-400">{compOriginal.oficinaExecutante}</strong></>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -685,8 +692,8 @@ export default function AeronaveDetail({
               </div>
 
               <form onSubmit={handleSaveComponente} className="space-y-6">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                  <div className="sm:col-span-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome do Componente ou Peça *</label>
                     <input
                       type="text"
@@ -705,6 +712,16 @@ export default function AeronaveDetail({
                       value={compMarca}
                       onChange={(e) => setCompMarca(e.target.value)}
                       placeholder="Ex: Lycoming, Champion"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Oficina Executante</label>
+                    <input
+                      type="text"
+                      value={compOficinaExecutante}
+                      onChange={(e) => setCompOficinaExecutante(e.target.value)}
+                      placeholder="Ex: Oficina Aero Sol, Hangar 12"
                       className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
                     />
                   </div>
@@ -966,6 +983,11 @@ export default function AeronaveDetail({
                                 <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
                                   <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
                                   <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
+                                  {c.oficinaExecutante && (
+                                    <div className="text-[10px] text-emerald-400 font-sans mt-1">
+                                      Oficina: <strong className="font-semibold text-slate-200">{c.oficinaExecutante}</strong>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </td>

@@ -72,6 +72,7 @@ export interface ComponenteControlado {
 
   marca?: string; // Marca / Fabricante do componente
   condicao?: 'novo' | 'overhaul'; // Condição do componente: novo ou overhaul
+  oficinaExecutante?: string; // Oficina executante do componente
 
   created_at?: string;
 }

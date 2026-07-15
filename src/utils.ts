@@ -35,14 +35,15 @@ export function calcularAlerta(
   aero: Aeronave,
   dataAtualISO: string = '2026-06-16'
 ): AlertaManutencao {
-  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData } = comp;
+  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao } = comp;
   const horasAtuais = aero.horasTotais;
+  const hInst = horasInstalacao || 0;
   
   // Cálculo de horas
   let horasRestantes = 999999;
   let horasLimite = 0;
   if (limiteHoras > 0) {
-    horasLimite = ultimaRevisaoHoras + limiteHoras;
+    horasLimite = hInst + limiteHoras - ultimaRevisaoHoras;
     horasRestantes = horasLimite - horasAtuais;
   }
   

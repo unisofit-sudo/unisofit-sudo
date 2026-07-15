@@ -185,10 +185,16 @@ export async function initDb() {
           fabricante VARCHAR(100) NOT NULL,
           ano INTEGER,
           horas_totais DOUBLE PRECISION DEFAULT 0,
+          horas_motor DOUBLE PRECISION DEFAULT 0,
+          horas_helice DOUBLE PRECISION DEFAULT 0,
           cliente_id VARCHAR(100),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
         );
+
+        -- Garante evolução para aeronaves
+        ALTER TABLE aeronaves ADD COLUMN IF NOT EXISTS horas_motor DOUBLE PRECISION DEFAULT 0;
+        ALTER TABLE aeronaves ADD COLUMN IF NOT EXISTS horas_helice DOUBLE PRECISION DEFAULT 0;
         
         CREATE TABLE IF NOT EXISTS historico_voos (
           id VARCHAR(100) PRIMARY KEY,
@@ -218,6 +224,7 @@ export async function initDb() {
           marca VARCHAR(255),
           condicao VARCHAR(50),
           oficina_executante VARCHAR(255),
+          sistema VARCHAR(50) DEFAULT 'celula',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_comp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
@@ -228,6 +235,7 @@ export async function initDb() {
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS marca VARCHAR(255);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS condicao VARCHAR(50);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS oficina_executante VARCHAR(255);
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS sistema VARCHAR(50) DEFAULT 'celula';
         
         CREATE TABLE IF NOT EXISTS revisoes (
           id VARCHAR(100) PRIMARY KEY,
@@ -349,6 +357,8 @@ export async function getAeronaves(clienteId?: string): Promise<Aeronave[]> {
       fabricante: row.fabricante,
       ano: row.ano,
       horasTotais: Number(row.horas_totais),
+      horasMotor: Number(row.horas_motor || 0),
+      horasHelice: Number(row.horas_helice || 0),
       clienteId: row.cliente_id,
       created_at: row.created_at
     }));
@@ -371,6 +381,8 @@ export async function getAeronaveById(id: string): Promise<Aeronave | null> {
       fabricante: row.fabricante,
       ano: row.ano,
       horasTotais: Number(row.horas_totais),
+      horasMotor: Number(row.horas_motor || 0),
+      horasHelice: Number(row.horas_helice || 0),
       clienteId: row.cliente_id,
       created_at: row.created_at
     };
@@ -383,10 +395,10 @@ export async function getAeronaveById(id: string): Promise<Aeronave | null> {
 export async function addAeronave(aeronave: Aeronave): Promise<Aeronave> {
   try {
     const p = checkPool();
-    const { id, matricula, modelo, fabricante, ano, horasTotais, clienteId } = aeronave;
+    const { id, matricula, modelo, fabricante, ano, horasTotais, horasMotor, horasHelice, clienteId } = aeronave;
     await p.query(
-      'INSERT INTO aeronaves (id, matricula, modelo, fabricante, ano, horas_totais, cliente_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [id, matricula, modelo, fabricante, ano, horasTotais, clienteId]
+      'INSERT INTO aeronaves (id, matricula, modelo, fabricante, ano, horas_totais, horas_motor, horas_helice, cliente_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [id, matricula, modelo, fabricante, ano, horasTotais, horasMotor || 0, horasHelice || 0, clienteId]
     );
     return aeronave;
   } catch (err: any) {
@@ -398,10 +410,10 @@ export async function addAeronave(aeronave: Aeronave): Promise<Aeronave> {
 export async function updateAeronave(aeronave: Aeronave): Promise<Aeronave> {
   try {
     const p = checkPool();
-    const { id, matricula, modelo, fabricante, ano, horasTotais, clienteId } = aeronave;
+    const { id, matricula, modelo, fabricante, ano, horasTotais, horasMotor, horasHelice, clienteId } = aeronave;
     await p.query(
-      'UPDATE aeronaves SET matricula = $1, modelo = $2, fabricante = $3, ano = $4, horas_totais = $5, cliente_id = $6 WHERE id = $7',
-      [matricula, modelo, fabricante, ano, horasTotais, clienteId, id]
+      'UPDATE aeronaves SET matricula = $1, modelo = $2, fabricante = $3, ano = $4, horas_totais = $5, horas_motor = $6, horas_helice = $7, cliente_id = $8 WHERE id = $9',
+      [matricula, modelo, fabricante, ano, horasTotais, horasMotor || 0, horasHelice || 0, clienteId, id]
     );
     return aeronave;
   } catch (err: any) {
@@ -460,7 +472,7 @@ export async function addVoo(voo: HistoricoVoo): Promise<HistoricoVoo> {
     
     // Atualizar horas totais da aeronave
     await p.query(
-      'UPDATE aeronaves SET horas_totais = horas_totais + $1 WHERE id = $2',
+      'UPDATE aeronaves SET horas_totais = horas_totais + $1, horas_motor = horas_motor + $1, horas_helice = horas_helice + $1 WHERE id = $2',
       [horasVoo, aeronaveId]
     );
     
@@ -480,7 +492,7 @@ export async function deleteVoo(id: string): Promise<void> {
       const { aeronave_id, horas_voo } = vooRes.rows[0];
       await p.query('DELETE FROM historico_voos WHERE id = $1', [id]);
       await p.query(
-        'UPDATE aeronaves SET horas_totais = GREATEST(0, horas_totais - $1) WHERE id = $2',
+        'UPDATE aeronaves SET horas_totais = GREATEST(0, horas_totais - $1), horas_motor = GREATEST(0, horas_motor - $1), horas_helice = GREATEST(0, horas_helice - $1) WHERE id = $2',
         [horas_voo, aeronave_id]
       );
     }
@@ -519,6 +531,7 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       marca: row.marca || undefined,
       condicao: (row.condicao as 'novo' | 'overhaul') || undefined,
       oficinaExecutante: row.oficina_executante || undefined,
+      sistema: (row.sistema as 'celula' | 'motor' | 'helice') || 'celula',
       created_at: row.created_at
     }));
   } catch (err: any) {
@@ -530,11 +543,11 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
     await p.query(
-      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao, oficina_executante)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
-      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null]
+      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao, oficina_executante, sistema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula']
     );
     return comp;
   } catch (err: any) {
@@ -546,10 +559,10 @@ export async function addComponente(comp: ComponenteControlado): Promise<Compone
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
     await p.query(
-      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12, marca = $13, condicao = $14, oficina_executante = $15 WHERE id = $16`,
-      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, id]
+      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12, marca = $13, condicao = $14, oficina_executante = $15, sistema = $16 WHERE id = $17`,
+      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula', id]
     );
     return comp;
   } catch (err: any) {

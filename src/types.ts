@@ -33,7 +33,9 @@ export interface Aeronave {
   modelo: string;
   fabricante: string;
   ano: number;
-  horasTotais: number; // Horas atuais acumuladas de voo
+  horasTotais: number; // Horas atuais acumuladas de voo (Célula)
+  horasMotor: number; // Horas acumuladas do motor
+  horasHelice: number; // Horas acumuladas da hélice
   clienteId: string;
   created_at?: string;
 }
@@ -73,6 +75,7 @@ export interface ComponenteControlado {
   marca?: string; // Marca / Fabricante do componente
   condicao?: 'novo' | 'overhaul'; // Condição do componente: novo ou overhaul
   oficinaExecutante?: string; // Oficina executante do componente
+  sistema?: 'celula' | 'motor' | 'helice'; // Associação com Célula, Motor ou Hélice
 
   created_at?: string;
 }

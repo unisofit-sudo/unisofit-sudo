@@ -257,7 +257,9 @@ async function startServer() {
     try {
       const aero = req.body;
       if (!aero.id) aero.id = 'aer_' + Math.random().toString(36).substr(2, 9);
-      if (typeof aero.horasTotais !== 'number') aero.horasTotais = 0;
+      if (typeof aero.horasTotais !== 'number') aero.horasTotais = Number(aero.horasTotais || 0);
+      if (typeof aero.horasMotor !== 'number') aero.horasMotor = Number(aero.horasMotor || 0);
+      if (typeof aero.horasHelice !== 'number') aero.horasHelice = Number(aero.horasHelice || 0);
       if (typeof aero.ano !== 'number') aero.ano = Number(aero.ano || new Date().getFullYear());
       const created = await addAeronave(aero);
       res.status(201).json(created);
@@ -270,6 +272,8 @@ async function startServer() {
     try {
       const aero = req.body;
       if (typeof aero.horasTotais !== 'number') aero.horasTotais = Number(aero.horasTotais || 0);
+      if (typeof aero.horasMotor !== 'number') aero.horasMotor = Number(aero.horasMotor || 0);
+      if (typeof aero.horasHelice !== 'number') aero.horasHelice = Number(aero.horasHelice || 0);
       if (typeof aero.ano !== 'number') aero.ano = Number(aero.ano || new Date().getFullYear());
       const updated = await updateAeronave(aero);
       res.json(updated);

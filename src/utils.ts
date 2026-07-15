@@ -35,8 +35,18 @@ export function calcularAlerta(
   aero: Aeronave,
   dataAtualISO: string = '2026-06-16'
 ): AlertaManutencao {
-  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao } = comp;
-  const horasAtuais = aero.horasTotais;
+  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao, sistema } = comp;
+  
+  // Determina as horas atuais com base no sistema associado (célula, motor ou hélice)
+  let horasAtuais = aero.horasTotais;
+  if (sistema === 'motor') {
+    horasAtuais = aero.horasMotor || 0;
+  } else if (sistema === 'helice') {
+    horasAtuais = aero.horasHelice || 0;
+  } else {
+    horasAtuais = aero.horasTotais || 0;
+  }
+  
   const hInst = horasInstalacao || 0;
   
   // Cálculo de horas

@@ -35,6 +35,8 @@ export default function AeronavesList({
   const [fabricante, setFabricante] = useState('');
   const [ano, setAno] = useState(new Date().getFullYear());
   const [horasTotais, setHorasTotais] = useState(0);
+  const [horasMotor, setHorasMotor] = useState(0);
+  const [horasHelice, setHorasHelice] = useState(0);
 
   const clientAeronaves = selectedCliente 
     ? aeronaves.filter(a => a.clienteId === selectedCliente.id)
@@ -52,6 +54,8 @@ export default function AeronavesList({
         fabricante,
         ano: Number(ano),
         horasTotais: Number(horasTotais),
+        horasMotor: Number(horasMotor),
+        horasHelice: Number(horasHelice),
         clienteId: selectedCliente.id
       });
     } else {
@@ -61,6 +65,8 @@ export default function AeronavesList({
         fabricante,
         ano: Number(ano),
         horasTotais: Number(horasTotais),
+        horasMotor: Number(horasMotor),
+        horasHelice: Number(horasHelice),
         clienteId: selectedCliente.id
       });
     }
@@ -72,6 +78,8 @@ export default function AeronavesList({
     setFabricante('');
     setAno(new Date().getFullYear());
     setHorasTotais(0);
+    setHorasMotor(0);
+    setHorasHelice(0);
   };
 
   const handleEdit = (a: Aeronave, e: React.MouseEvent) => {
@@ -82,6 +90,8 @@ export default function AeronavesList({
     setFabricante(a.fabricante);
     setAno(a.ano);
     setHorasTotais(a.horasTotais);
+    setHorasMotor(a.horasMotor || 0);
+    setHorasHelice(a.horasHelice || 0);
     setIsFormOpen(true);
   };
 
@@ -99,6 +109,8 @@ export default function AeronavesList({
     setFabricante('');
     setAno(new Date().getFullYear());
     setHorasTotais(0);
+    setHorasMotor(0);
+    setHorasHelice(0);
     setIsFormOpen(true);
   };
 
@@ -171,9 +183,19 @@ export default function AeronavesList({
                     <p className="text-[11px] text-slate-400 mt-1">{a.fabricante} • Ano {a.ano}</p>
                     
                     {/* Horas */}
-                    <div className="flex items-center gap-1.5 mt-2.5 text-xs text-sky-400 font-semibold bg-sky-950/20 border border-sky-500/20 px-3 py-1.5 rounded-xl w-fit font-mono">
-                      <Gauge className="w-3.5 h-3.5" />
-                      <span>{a.horasTotais.toFixed(1)} Horas de Voo (T.S.N.)</span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex items-center gap-1 text-[11px] text-sky-400 font-semibold bg-sky-950/20 border border-sky-500/20 px-2.5 py-1 rounded-xl font-mono">
+                        <Gauge className="w-3 h-3" />
+                        <span>Célula: {a.horasTotais.toFixed(1)} hs</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold bg-emerald-950/20 border border-emerald-500/20 px-2.5 py-1 rounded-xl font-mono">
+                        <Gauge className="w-3 h-3" />
+                        <span>Motor: {(a.horasMotor || 0).toFixed(1)} hs</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-amber-400 font-semibold bg-amber-950/20 border border-amber-500/20 px-2.5 py-1 rounded-xl font-mono">
+                        <Gauge className="w-3 h-3" />
+                        <span>Hélice: {(a.horasHelice || 0).toFixed(1)} hs</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -274,25 +296,57 @@ export default function AeronavesList({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Horas Totais Atuais *</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Horas Totais Célula *</label>
                   <input
                     type="number"
                     step="0.1"
                     required
                     value={horasTotais}
-                    disabled={!!editingAeronave} // Evitar alteração arbitrária no edit. Usar histórico de voo de preferência!
+                    disabled={!!editingAeronave}
                     onChange={(e) => setHorasTotais(Number(e.target.value))}
                     min={0}
                     placeholder="Ex: 1450.5"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 disabled:opacity-50"
                   />
-                  {editingAeronave && (
-                    <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
-                      As horas devem ser atualizadas inserindo novos voos no diário de bordo.
-                    </span>
-                  )}
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Horas Totais Motor *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={horasMotor}
+                    disabled={!!editingAeronave}
+                    onChange={(e) => setHorasMotor(Number(e.target.value))}
+                    min={0}
+                    placeholder="Ex: 1450.5"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Horas Totais Hélice *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    value={horasHelice}
+                    disabled={!!editingAeronave}
+                    onChange={(e) => setHorasHelice(Number(e.target.value))}
+                    min={0}
+                    placeholder="Ex: 1450.5"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-sky-500 text-slate-100 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {editingAeronave && (
+                <span className="text-[9px] text-slate-400 block mt-1 leading-normal">
+                  As horas devem ser atualizadas inserindo novos voos no diário de bordo.
+                </span>
+              )}
 
               <div className="pt-4 border-t border-slate-800 flex justify-end gap-2.5">
                 <button

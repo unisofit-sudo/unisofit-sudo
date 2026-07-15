@@ -65,9 +65,10 @@ export default function AeronaveDetail({
   const [compSerialNumber, setCompSerialNumber] = useState('');
   const [compLimiteHoras, setCompLimiteHoras] = useState(500);
   const [compLimiteDias, setCompLimiteDias] = useState(365);
+  const [compSistema, setCompSistema] = useState<'celula' | 'motor' | 'helice'>('celula');
   const [compHorasInstalacao, setCompHorasInstalacao] = useState(aeronave.horasTotais);
   const [compDataInstalacao, setCompDataInstalacao] = useState(new Date().toISOString().split('T')[0]);
-  const [compUltimaRevisaoHoras, setCompUltimaRevisaoHoras] = useState(aeronave.horasTotais);
+  const [compUltimaRevisaoHoras, setCompUltimaRevisaoHoras] = useState(0);
   const [compUltimaRevisaoData, setCompUltimaRevisaoData] = useState(new Date().toISOString().split('T')[0]);
   const [compAttachmentName, setCompAttachmentName] = useState('');
   const [compAttachmentData, setCompAttachmentData] = useState('');
@@ -75,13 +76,32 @@ export default function AeronaveDetail({
   const [compOficinaExecutante, setCompOficinaExecutante] = useState('');
   const [compCondicao, setCompCondicao] = useState<'novo' | 'overhaul'>('novo');
 
+  const getAeronaveHoursForSistema = (sistema: 'celula' | 'motor' | 'helice') => {
+    if (sistema === 'motor') return aeronave.horasMotor || 0;
+    if (sistema === 'helice') return aeronave.horasHelice || 0;
+    return aeronave.horasTotais || 0;
+  };
+
   // Mantém a Data da Última Revisão igual à Data da Instalação se for componente "Novo"
   useEffect(() => {
     if (compCondicao === 'novo') {
       setCompUltimaRevisaoData(compDataInstalacao);
-      setCompUltimaRevisaoHoras(compHorasInstalacao);
+      setCompUltimaRevisaoHoras(0); // Novo sempre começa com 0 horas de trabalho do componente
     }
-  }, [compCondicao, compDataInstalacao, compHorasInstalacao]);
+  }, [compCondicao, compDataInstalacao]);
+
+  // Sincroniza horas padrão com base no sistema selecionado ao cadastrar um novo componente
+  useEffect(() => {
+    if (!compEditing) {
+      const currentHrs = getAeronaveHoursForSistema(compSistema);
+      setCompHorasInstalacao(currentHrs);
+      if (compCondicao === 'novo') {
+        setCompUltimaRevisaoHoras(0);
+      } else {
+        setCompUltimaRevisaoHoras(currentHrs);
+      }
+    }
+  }, [compSistema, compCondicao, compEditing]);
 
   // Formulário: Nova Revisão / Carga de Laudo
   const [isRevFormOpen, setIsRevFormOpen] = useState(false);
@@ -191,7 +211,8 @@ export default function AeronaveDetail({
       dadosAnexo: compAttachmentData || undefined,
       marca: compMarca.trim() || undefined,
       condicao: compCondicao,
-      oficinaExecutante: compOficinaExecutante.trim() || undefined
+      oficinaExecutante: compOficinaExecutante.trim() || undefined,
+      sistema: compSistema
     };
 
     try {
@@ -219,6 +240,7 @@ export default function AeronaveDetail({
     setCompSerialNumber(c.serialNumber || '');
     setCompLimiteHoras(c.limiteHoras);
     setCompLimiteDias(c.limiteDias);
+    setCompSistema(c.sistema || 'celula');
     setCompHorasInstalacao(c.horasInstalacao);
     setCompDataInstalacao(c.dataInstalacao);
     setCompUltimaRevisaoHoras(c.ultimaRevisaoHoras);
@@ -284,9 +306,10 @@ export default function AeronaveDetail({
     setCompSerialNumber('');
     setCompLimiteHoras(500);
     setCompLimiteDias(365);
+    setCompSistema('celula');
     setCompHorasInstalacao(aeronave.horasTotais);
     setCompDataInstalacao(new Date().toISOString().split('T')[0]);
-    setCompUltimaRevisaoHoras(aeronave.horasTotais);
+    setCompUltimaRevisaoHoras(0);
     setCompUltimaRevisaoData(new Date().toISOString().split('T')[0]);
     setCompAttachmentName('');
     setCompAttachmentData('');
@@ -380,14 +403,26 @@ export default function AeronaveDetail({
             </p>
           </div>
           
-          <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/30 w-full md:w-auto flex items-center lg:items-start gap-4 flex-shrink-0">
-            <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20">
+          <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/30 w-full md:w-auto flex items-center gap-4 flex-shrink-0">
+            <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20 self-center">
               <Gauge className="w-6 h-6" />
             </div>
-            <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Horas Totais de Voo</p>
-              <p className="text-2xl font-black text-sky-400">{aeronave.horasTotais.toFixed(1)} <span className="text-xs font-normal text-slate-400">hs</span></p>
-              <span className="text-[9px] text-slate-500 block">Tempo em Serviço (T.S.N.)</span>
+            <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-3 gap-x-4 divide-x divide-slate-800">
+                <div className="pr-2">
+                  <p className="text-[9px] text-sky-400 font-bold uppercase tracking-wider mb-0.5">Célula</p>
+                  <p className="text-sm sm:text-base font-black text-slate-100">{aeronave.horasTotais.toFixed(1)}<span className="text-[10px] font-normal text-slate-400 ml-0.5">hs</span></p>
+                </div>
+                <div className="px-3">
+                  <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mb-0.5">Motor</p>
+                  <p className="text-sm sm:text-base font-black text-slate-100">{(aeronave.horasMotor || 0).toFixed(1)}<span className="text-[10px] font-normal text-slate-400 ml-0.5">hs</span></p>
+                </div>
+                <div className="pl-3">
+                  <p className="text-[9px] text-amber-400 font-bold uppercase tracking-wider mb-0.5">Hélice</p>
+                  <p className="text-sm sm:text-base font-black text-slate-100">{(aeronave.horasHelice || 0).toFixed(1)}<span className="text-[10px] font-normal text-slate-400 ml-0.5">hs</span></p>
+                </div>
+              </div>
+              <span className="text-[9px] text-slate-500 block leading-none">Tempo em Serviço (T.S.N.)</span>
             </div>
           </div>
         </div>
@@ -705,6 +740,68 @@ export default function AeronaveDetail({
                     />
                   </div>
 
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Este componente está associado a:</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        compSistema === 'celula' 
+                          ? 'bg-sky-500/10 border-sky-500/50 text-white shadow-md shadow-sky-500/5' 
+                          : 'bg-slate-1000 border-slate-750 text-slate-400 hover:border-slate-700'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="sistema"
+                          value="celula"
+                          checked={compSistema === 'celula'}
+                          onChange={() => setCompSistema('celula')}
+                          className="sr-only"
+                        />
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${compSistema === 'celula' ? 'border-sky-500' : 'border-slate-600'}`}>
+                          {compSistema === 'celula' && <div className="w-2 h-2 rounded-full bg-sky-500" />}
+                        </div>
+                        <span className="text-xs font-semibold">Célula</span>
+                      </label>
+
+                      <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        compSistema === 'motor' 
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-white shadow-md shadow-emerald-500/5' 
+                          : 'bg-slate-1000 border-slate-750 text-slate-400 hover:border-slate-700'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="sistema"
+                          value="motor"
+                          checked={compSistema === 'motor'}
+                          onChange={() => setCompSistema('motor')}
+                          className="sr-only"
+                        />
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${compSistema === 'motor' ? 'border-emerald-500' : 'border-slate-600'}`}>
+                          {compSistema === 'motor' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                        </div>
+                        <span className="text-xs font-semibold">Motor</span>
+                      </label>
+
+                      <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        compSistema === 'helice' 
+                          ? 'bg-amber-500/10 border-amber-500/50 text-white shadow-md shadow-amber-500/5' 
+                          : 'bg-slate-1000 border-slate-750 text-slate-400 hover:border-slate-700'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="sistema"
+                          value="helice"
+                          checked={compSistema === 'helice'}
+                          onChange={() => setCompSistema('helice')}
+                          className="sr-only"
+                        />
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${compSistema === 'helice' ? 'border-amber-500' : 'border-slate-600'}`}>
+                          {compSistema === 'helice' && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                        </div>
+                        <span className="text-xs font-semibold">Hélice</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Marca / Fabricante</label>
                     <input
@@ -956,6 +1053,17 @@ export default function AeronaveDetail({
                                         : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                                     }`}>
                                       {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
+                                    </span>
+                                  )}
+                                  {c.sistema && (
+                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                      c.sistema === 'motor'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : c.sistema === 'helice'
+                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                        : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                    }`}>
+                                      {c.sistema === 'celula' ? 'Célula' : c.sistema === 'motor' ? 'Motor' : 'Hélice'}
                                     </span>
                                   )}
                                 </div>

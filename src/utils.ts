@@ -35,33 +35,67 @@ export function calcularAlerta(
   aero: Aeronave,
   dataAtualISO: string = '2026-06-16'
 ): AlertaManutencao {
-  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao, sistema } = comp;
+  const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao, sistema, dataInstalacao, condicao } = comp;
   
-  // Determina as horas atuais com base no sistema associado (célula, motor ou hélice)
-  let horasAtuais = aero.horasTotais;
+  // Determina as horas voadas do sistema específico da aeronave desde a instalação do componente
+  let horasVoadasDesdeInstalacao = 0;
   if (sistema === 'motor') {
-    horasAtuais = aero.horasMotor || 0;
+    const instMotor = comp.horasInstalacaoMotor || 0;
+    const currentMotor = aero.horasMotor || 0;
+    horasVoadasDesdeInstalacao = Math.max(0, currentMotor - instMotor);
   } else if (sistema === 'helice') {
-    horasAtuais = aero.horasHelice || 0;
+    const instHelice = comp.horasInstalacaoHelice || 0;
+    const currentHelice = aero.horasHelice || 0;
+    horasVoadasDesdeInstalacao = Math.max(0, currentHelice - instHelice);
   } else {
-    horasAtuais = aero.horasTotais || 0;
+    const instCelula = comp.horasInstalacao || 0;
+    const currentCelula = aero.horasTotais || 0;
+    horasVoadasDesdeInstalacao = Math.max(0, currentCelula - instCelula);
   }
-  
-  const hInst = horasInstalacao || 0;
-  
-  // Cálculo de horas
-  let horasRestantes = 999999;
+
   let horasLimite = 0;
+  let horasRestantes = 999999;
+
+  let horasLimiteCelula: number | undefined;
+  let horasLimiteMotor: number | undefined;
+  let horasLimiteHelice: number | undefined;
+  let horasRestantesCelula: number | undefined;
+  let horasRestantesMotor: number | undefined;
+  let horasRestantesHelice: number | undefined;
+
   if (limiteHoras > 0) {
-    horasLimite = hInst + limiteHoras - ultimaRevisaoHoras;
-    horasRestantes = horasLimite - horasAtuais;
+    // Os limites nos respectivos horímetros da aeronave onde ocorrerá o vencimento
+    horasLimiteCelula = (comp.horasInstalacao || 0) + limiteHoras;
+    horasLimiteMotor = (comp.horasInstalacaoMotor || 0) + limiteHoras;
+    horasLimiteHelice = (comp.horasInstalacaoHelice || 0) + limiteHoras;
+
+    // Horas restantes em cada sistema
+    horasRestantesCelula = horasLimiteCelula - (aero.horasTotais || 0);
+    horasRestantesMotor = horasLimiteMotor - (aero.horasMotor || 0);
+    horasRestantesHelice = horasLimiteHelice - (aero.horasHelice || 0);
+
+    // O limite geral e horas restantes a serem considerados para o cálculo principal e barra de progresso
+    if (sistema === 'motor') {
+      horasLimite = horasLimiteMotor;
+      horasRestantes = horasRestantesMotor;
+    } else if (sistema === 'helice') {
+      horasLimite = horasLimiteHelice;
+      horasRestantes = horasRestantesHelice;
+    } else {
+      horasLimite = horasLimiteCelula;
+      horasRestantes = horasRestantesCelula;
+    }
   }
   
   // Cálculo de dias
   let diasRestantes = 999999;
   let dataVencimento = '';
-  if (limiteDias > 0 && ultimaRevisaoData) {
-    dataVencimento = adicionarDias(ultimaRevisaoData, limiteDias);
+  
+  // Se for overhauled, considera a data da última revisão como data de referência. Caso contrário, a de instalação.
+  const dataRef = (condicao === 'overhaul' && ultimaRevisaoData) ? ultimaRevisaoData : dataInstalacao;
+  
+  if (limiteDias > 0 && dataRef) {
+    dataVencimento = adicionarDias(dataRef, limiteDias);
     diasRestantes = diferencaDias(dataVencimento, dataAtualISO);
   }
   
@@ -106,9 +140,15 @@ export function calcularAlerta(
     horasUltima: ultimaRevisaoHoras,
     diasRestantes: limiteDias > 0 ? diasRestantes : 0,
     diasLimite: limiteDias,
-    dataUltima: ultimaRevisaoData,
+    dataUltima: dataRef || '',
     dataVencimento,
-    status
+    status,
+    horasLimiteCelula,
+    horasLimiteMotor,
+    horasLimiteHelice,
+    horasRestantesCelula,
+    horasRestantesMotor,
+    horasRestantesHelice
   };
 }
 

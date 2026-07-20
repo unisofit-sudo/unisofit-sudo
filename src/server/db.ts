@@ -236,6 +236,12 @@ export async function initDb() {
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS condicao VARCHAR(50);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS oficina_executante VARCHAR(255);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS sistema VARCHAR(50) DEFAULT 'celula';
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS horas_instalacao_motor DOUBLE PRECISION DEFAULT 0;
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS horas_instalacao_helice DOUBLE PRECISION DEFAULT 0;
+        
+        -- Inicializa dados de migração para novos campos
+        UPDATE componentes SET horas_instalacao_motor = horas_instalacao WHERE sistema = 'motor' AND (horas_instalacao_motor IS NULL OR horas_instalacao_motor = 0);
+        UPDATE componentes SET horas_instalacao_helice = horas_instalacao WHERE sistema = 'helice' AND (horas_instalacao_helice IS NULL OR horas_instalacao_helice = 0);
         
         CREATE TABLE IF NOT EXISTS revisoes (
           id VARCHAR(100) PRIMARY KEY,
@@ -263,8 +269,24 @@ export async function initDb() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_cliente_oficina FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
         );
+
+        -- Executa migrações automáticas de dados dos componentes para representação direta
+        -- 1. Para componentes com revisões registradas (onde ultima_revisao_horas > horas_instalacao)
+        UPDATE componentes 
+        SET horas_instalacao = ultima_revisao_horas, ultima_revisao_horas = 0 
+        WHERE ultima_revisao_horas > horas_instalacao;
+
+        -- 2. Para componentes novos
+        UPDATE componentes 
+        SET ultima_revisao_horas = 0 
+        WHERE condicao = 'novo' AND ultima_revisao_horas = horas_instalacao AND horas_instalacao > 0;
+
+        -- 3. Para componentes overhaul
+        UPDATE componentes 
+        SET ultima_revisao_horas = horas_instalacao - ultima_revisao_horas 
+        WHERE condicao = 'overhaul' AND ultima_revisao_horas > 0 AND ultima_revisao_horas <= horas_instalacao AND horas_instalacao > 0;
       `);
-      console.log('Tabelas PostgreSQL inicializadas com sucesso.');
+      console.log('Tabelas PostgreSQL inicializadas com sucesso e migração de componentes finalizada.');
       dbConnectionError = null; // Limpa qualquer erro anterior de conexão
     } catch (err: any) {
       dbConnectionError = 'Falha ao inicializar tabelas no PostgreSQL: ' + (err?.message || String(err));
@@ -523,6 +545,8 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
       limiteHoras: Number(row.limite_horas),
       limiteDias: Number(row.limite_dias),
       horasInstalacao: Number(row.horas_instalacao),
+      horasInstalacaoMotor: Number(row.horas_instalacao_motor || 0),
+      horasInstalacaoHelice: Number(row.horas_instalacao_helice || 0),
       dataInstalacao: row.data_instalacao,
       ultimaRevisaoHoras: Number(row.ultima_revisao_horas),
       ultimaRevisaoData: row.ultima_revisao_data,
@@ -543,11 +567,11 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
     await p.query(
-      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao, oficina_executante, sistema)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula']
+      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, horas_instalacao_motor, horas_instalacao_helice, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao, oficina_executante, sistema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula']
     );
     return comp;
   } catch (err: any) {
@@ -559,10 +583,10 @@ export async function addComponente(comp: ComponenteControlado): Promise<Compone
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
     await p.query(
-      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, data_instalacao = $8, ultima_revisao_horas = $9, ultima_revisao_data = $10, nome_anexo = $11, dados_anexo = $12, marca = $13, condicao = $14, oficina_executante = $15, sistema = $16 WHERE id = $17`,
-      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula', id]
+      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, horas_instalacao_motor = $8, horas_instalacao_helice = $9, data_instalacao = $10, ultima_revisao_horas = $11, ultima_revisao_data = $12, nome_anexo = $13, dados_anexo = $14, marca = $15, condicao = $16, oficina_executante = $17, sistema = $18 WHERE id = $19`,
+      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula', id]
     );
     return comp;
   } catch (err: any) {
@@ -624,7 +648,7 @@ export async function addRevisao(rev: RevisaoLaudo): Promise<RevisaoLaudo> {
     // Se a revisão foi em um componente específico, atualiza suas datas de última revisão
     if (componenteId) {
       await p.query(
-        `UPDATE componentes SET ultima_revisao_horas = $1, ultima_revisao_data = $2 WHERE id = $3`,
+        `UPDATE componentes SET horas_instalacao = $1, ultima_revisao_horas = 0, ultima_revisao_data = $2 WHERE id = $3`,
         [horasNaRevisao, data, componenteId]
       );
     }

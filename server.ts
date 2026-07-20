@@ -341,6 +341,8 @@ async function startServer() {
       comp.limiteHoras = Number(comp.limiteHoras || 0);
       comp.limiteDias = Number(comp.limiteDias || 0);
       comp.horasInstalacao = Number(comp.horasInstalacao || 0);
+      comp.horasInstalacaoMotor = comp.horasInstalacaoMotor !== undefined ? Number(comp.horasInstalacaoMotor || 0) : undefined;
+      comp.horasInstalacaoHelice = comp.horasInstalacaoHelice !== undefined ? Number(comp.horasInstalacaoHelice || 0) : undefined;
       comp.ultimaRevisaoHoras = Number(comp.ultimaRevisaoHoras || 0);
       const created = await addComponente(comp);
       res.status(201).json(created);
@@ -355,6 +357,8 @@ async function startServer() {
       comp.limiteHoras = Number(comp.limiteHoras || 0);
       comp.limiteDias = Number(comp.limiteDias || 0);
       comp.horasInstalacao = Number(comp.horasInstalacao || 0);
+      comp.horasInstalacaoMotor = comp.horasInstalacaoMotor !== undefined ? Number(comp.horasInstalacaoMotor || 0) : undefined;
+      comp.horasInstalacaoHelice = comp.horasInstalacaoHelice !== undefined ? Number(comp.horasInstalacaoHelice || 0) : undefined;
       comp.ultimaRevisaoHoras = Number(comp.ultimaRevisaoHoras || 0);
       const updated = await updateComponente(comp);
       res.json(updated);

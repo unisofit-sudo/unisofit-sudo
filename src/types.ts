@@ -62,7 +62,9 @@ export interface ComponenteControlado {
   limiteDias: number;  // Limite de dias entre revisões, ex: 365 (colocar 0 se não controlado por dias)
   
   // Datas e horas de referência
-  horasInstalacao: number; // Horas de voo da aeronave quando instalado
+  horasInstalacao: number; // Horas de voo da aeronave quando instalado (Célula)
+  horasInstalacaoMotor?: number; // Horas do motor quando instalado
+  horasInstalacaoHelice?: number; // Horas da hélice quando instalado
   dataInstalacao: string; // Data de instalação: YYYY-MM-DD
   
   // Dados da última revisão
@@ -111,6 +113,14 @@ export interface AlertaManutencao {
   dataVencimento: string;
   
   status: 'regular' | 'atencao' | 'critico'; // critico = venceu ou < 10% restante, atencao = < 25% restante
+  
+  // Campos para múltiplos sistemas (Célula e Motor/Hélice)
+  horasLimiteCelula?: number;
+  horasLimiteMotor?: number;
+  horasLimiteHelice?: number;
+  horasRestantesCelula?: number;
+  horasRestantesMotor?: number;
+  horasRestantesHelice?: number;
 }
 
 export interface DashboardStats {

@@ -67,6 +67,8 @@ export default function AeronaveDetail({
   const [compLimiteDias, setCompLimiteDias] = useState(365);
   const [compSistema, setCompSistema] = useState<'celula' | 'motor' | 'helice'>('celula');
   const [compHorasInstalacao, setCompHorasInstalacao] = useState(aeronave.horasTotais);
+  const [compHorasInstalacaoMotor, setCompHorasInstalacaoMotor] = useState(aeronave.horasMotor);
+  const [compHorasInstalacaoHelice, setCompHorasInstalacaoHelice] = useState(aeronave.horasHelice);
   const [compDataInstalacao, setCompDataInstalacao] = useState(new Date().toISOString().split('T')[0]);
   const [compUltimaRevisaoHoras, setCompUltimaRevisaoHoras] = useState(0);
   const [compUltimaRevisaoData, setCompUltimaRevisaoData] = useState(new Date().toISOString().split('T')[0]);
@@ -81,27 +83,6 @@ export default function AeronaveDetail({
     if (sistema === 'helice') return aeronave.horasHelice || 0;
     return aeronave.horasTotais || 0;
   };
-
-  // Mantém a Data da Última Revisão igual à Data da Instalação se for componente "Novo"
-  useEffect(() => {
-    if (compCondicao === 'novo') {
-      setCompUltimaRevisaoData(compDataInstalacao);
-      setCompUltimaRevisaoHoras(0); // Novo sempre começa com 0 horas de trabalho do componente
-    }
-  }, [compCondicao, compDataInstalacao]);
-
-  // Sincroniza horas padrão com base no sistema selecionado ao cadastrar um novo componente
-  useEffect(() => {
-    if (!compEditing) {
-      const currentHrs = getAeronaveHoursForSistema(compSistema);
-      setCompHorasInstalacao(currentHrs);
-      if (compCondicao === 'novo') {
-        setCompUltimaRevisaoHoras(0);
-      } else {
-        setCompUltimaRevisaoHoras(currentHrs);
-      }
-    }
-  }, [compSistema, compCondicao, compEditing]);
 
   // Formulário: Nova Revisão / Carga de Laudo
   const [isRevFormOpen, setIsRevFormOpen] = useState(false);
@@ -195,6 +176,10 @@ export default function AeronaveDetail({
     e.preventDefault();
     if (!compNome.trim()) return;
 
+    // Salva exatamente as horas informadas de uso acumulado do componente
+    const dbUltimaRevisaoHoras = compCondicao === 'novo' ? 0 : Number(compUltimaRevisaoHoras || 0);
+    const dbUltimaRevisaoData = compCondicao === 'novo' ? compDataInstalacao : (compUltimaRevisaoData || compDataInstalacao);
+
     const compPayload = {
       id: compEditing?.id,
       aeronaveId: aeronave.id,
@@ -204,9 +189,11 @@ export default function AeronaveDetail({
       limiteHoras: Number(compLimiteHoras || 0),
       limiteDias: Number(compLimiteDias || 0),
       horasInstalacao: Number(compHorasInstalacao || 0),
+      horasInstalacaoMotor: Number(compHorasInstalacaoMotor || 0),
+      horasInstalacaoHelice: Number(compHorasInstalacaoHelice || 0),
       dataInstalacao: compDataInstalacao,
-      ultimaRevisaoHoras: Number(compUltimaRevisaoHoras || 0),
-      ultimaRevisaoData: compUltimaRevisaoData,
+      ultimaRevisaoHoras: dbUltimaRevisaoHoras,
+      ultimaRevisaoData: dbUltimaRevisaoData,
       nomeAnexo: compAttachmentName || undefined,
       dadosAnexo: compAttachmentData || undefined,
       marca: compMarca.trim() || undefined,
@@ -242,8 +229,13 @@ export default function AeronaveDetail({
     setCompLimiteDias(c.limiteDias);
     setCompSistema(c.sistema || 'celula');
     setCompHorasInstalacao(c.horasInstalacao);
+    setCompHorasInstalacaoMotor(c.horasInstalacaoMotor || 0);
+    setCompHorasInstalacaoHelice(c.horasInstalacaoHelice || 0);
     setCompDataInstalacao(c.dataInstalacao);
-    setCompUltimaRevisaoHoras(c.ultimaRevisaoHoras);
+
+    // Em representação direta, c.ultimaRevisaoHoras armazena diretamente as horas de uso do componente
+    setCompUltimaRevisaoHoras(c.condicao === 'novo' ? 0 : c.ultimaRevisaoHoras);
+
     setCompUltimaRevisaoData(c.ultimaRevisaoData);
     setCompAttachmentName(c.nomeAnexo || '');
     setCompAttachmentData(c.dadosAnexo || '');
@@ -308,6 +300,8 @@ export default function AeronaveDetail({
     setCompLimiteDias(365);
     setCompSistema('celula');
     setCompHorasInstalacao(aeronave.horasTotais);
+    setCompHorasInstalacaoMotor(aeronave.horasMotor);
+    setCompHorasInstalacaoHelice(aeronave.horasHelice);
     setCompDataInstalacao(new Date().toISOString().split('T')[0]);
     setCompUltimaRevisaoHoras(0);
     setCompUltimaRevisaoData(new Date().toISOString().split('T')[0]);
@@ -617,21 +611,57 @@ export default function AeronaveDetail({
                               <Calendar className="w-3.5 h-3.5 text-slate-500" />
                               {formatDataBR(al.dataUltima)}
                             </span>
-                            <span className="text-[10px] text-slate-505 italic block mt-0.5">Com {al.horasUltima.toFixed(1)} hs voo</span>
+                            <span className="text-[10px] text-slate-505 italic block mt-0.5">
+                              Com {al.horasUltima.toFixed(1)} hs voo ({compOriginal.sistema === 'celula' ? 'Célula' : compOriginal.sistema === 'motor' ? 'Motor' : 'Hélice'})
+                            </span>
                           </div>
                           <div>
                             <span className="text-slate-405 text-[10px] block font-semibold mb-1">Vencimento Planejado</span>
-                            {al.metric !== 'horas' && (
+                            {compOriginal.limiteDias > 0 && al.dataVencimento && (
                               <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                                 {formatDataBR(al.dataVencimento)}
                               </span>
                             )}
-                            {al.metric !== 'dias' && (
-                              <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-slate-500" />
-                                {al.horasLimite.toFixed(1)} hs voo
-                              </span>
+                            {compOriginal.limiteHoras > 0 && (
+                              <div className="space-y-0.5 mt-1 font-mono">
+                                {compOriginal.sistema === 'celula' && al.horasLimiteCelula !== undefined && (
+                                  <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                    Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                  </span>
+                                )}
+                                {compOriginal.sistema === 'motor' && (
+                                  <>
+                                    {al.horasLimiteCelula !== undefined && (
+                                      <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                        Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                      </span>
+                                    )}
+                                    {al.horasLimiteMotor !== undefined && (
+                                      <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[11px] pl-5">
+                                        Motor: {al.horasLimiteMotor.toFixed(1)} hs
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                                {compOriginal.sistema === 'helice' && (
+                                  <>
+                                    {al.horasLimiteCelula !== undefined && (
+                                      <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                        Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                      </span>
+                                    )}
+                                    {al.horasLimiteHelice !== undefined && (
+                                      <span className="font-semibold text-amber-400 flex items-center gap-1.5 text-[11px] pl-5">
+                                        Hélice: {al.horasLimiteHelice.toFixed(1)} hs
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -642,23 +672,71 @@ export default function AeronaveDetail({
                         
                         {/* Margem de Horas */}
                         {(al.metric === 'horas' || al.metric === 'ambas') && (
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span className="text-slate-400 text-[10px] uppercase font-bold">Margem por Horas de Voo</span>
-                              <span className={textAlertClass}>
-                                {al.horasRestantes <= 0 ? 'Vencido!' : `${al.horasRestantes.toFixed(1)} hs restantes`}
-                              </span>
+                          <div className="space-y-2">
+                            <div className="flex flex-col space-y-1">
+                              <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Margem por Horas de Voo</span>
+                              
+                              {compOriginal.sistema === 'celula' && al.horasRestantesCelula !== undefined && (
+                                <div className="flex justify-between text-xs font-semibold">
+                                  <span className="text-slate-350">Célula:</span>
+                                  <span className={textAlertClass}>
+                                    {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {compOriginal.sistema === 'motor' && (
+                                <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
+                                  {al.horasRestantesCelula !== undefined && (
+                                    <div className="flex justify-between text-xs font-semibold">
+                                      <span className="text-slate-350">Célula:</span>
+                                      <span className={textAlertClass}>
+                                        {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {al.horasRestantesMotor !== undefined && (
+                                    <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
+                                      <span className="text-emerald-400">Motor:</span>
+                                      <span className="text-emerald-400 font-mono font-bold">
+                                        {al.horasRestantesMotor <= 0 ? 'Vencido!' : `${al.horasRestantesMotor.toFixed(1)} hs rest.`}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {compOriginal.sistema === 'helice' && (
+                                <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
+                                  {al.horasRestantesCelula !== undefined && (
+                                    <div className="flex justify-between text-xs font-semibold">
+                                      <span className="text-slate-350">Célula:</span>
+                                      <span className={textAlertClass}>
+                                        {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {al.horasRestantesHelice !== undefined && (
+                                    <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
+                                      <span className="text-amber-400">Hélice:</span>
+                                      <span className="text-amber-400 font-mono font-bold">
+                                        {al.horasRestantesHelice <= 0 ? 'Vencido!' : `${al.horasRestantesHelice.toFixed(1)} hs rest.`}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             
                             {/* Barra de Progresso */}
-                            <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-slate-800/80">
+                            <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
                               <div
                                 className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-500' : 'bg-emerald-500'}`}
                                 style={{ width: `${Math.max(0, Math.min(100, (al.horasRestantes / compOriginal.limiteHoras) * 100))}%` }}
                               ></div>
                             </div>
                             <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
-                              <span>Instalado: {compOriginal.horasInstalacao} hs</span>
+                              <span>Instalado: {compOriginal.horasInstalacao} hs ({compOriginal.sistema === 'celula' ? 'Célula' : compOriginal.sistema === 'motor' ? 'Motor' : 'Hélice'})</span>
                               <span>Intervalo: {compOriginal.limiteHoras} hs</span>
                             </div>
                           </div>
@@ -675,7 +753,7 @@ export default function AeronaveDetail({
                             </div>
                             
                             {/* Barra de Progresso */}
-                            <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-slate-800/80">
+                            <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
                               <div
                                 className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-400' : 'bg-emerald-500'}`}
                                 style={{ width: `${Math.max(0, Math.min(100, (al.diasRestantes / compOriginal.limiteDias) * 100))}%` }}
@@ -849,7 +927,11 @@ export default function AeronaveDetail({
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => setCompCondicao('novo')}
+                      onClick={() => {
+                        setCompCondicao('novo');
+                        setCompUltimaRevisaoHoras(0);
+                        setCompUltimaRevisaoData(compDataInstalacao);
+                      }}
                       className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         compCondicao === 'novo'
                           ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/5'
@@ -861,7 +943,12 @@ export default function AeronaveDetail({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setCompCondicao('overhaul')}
+                      onClick={() => {
+                        setCompCondicao('overhaul');
+                        if (!compEditing && compUltimaRevisaoHoras === 0) {
+                          setCompUltimaRevisaoHoras(compHorasInstalacao);
+                        }
+                      }}
                       className={`flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         compCondicao === 'overhaul'
                           ? 'bg-purple-500/10 border-purple-500 text-purple-400 shadow-lg shadow-purple-500/5'
@@ -903,19 +990,27 @@ export default function AeronaveDetail({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data da Instalação *</label>
                     <input
                       type="date"
                       required
                       value={compDataInstalacao}
-                      onChange={(e) => setCompDataInstalacao(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCompDataInstalacao(val);
+                        if (compCondicao === 'novo') {
+                          setCompUltimaRevisaoData(val);
+                        }
+                      }}
                       className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Horas Totais da Aeronave *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                      Horas Totais da Célula na Instalação *
+                    </label>
                     <input
                       type="number"
                       step="0.1"
@@ -925,7 +1020,41 @@ export default function AeronaveDetail({
                       className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono transition-colors"
                     />
                   </div>
+                </div>
 
+                {compSistema === 'motor' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-emerald-400 mb-1.5">
+                      Horas Totais do Motor na Instalação *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={compHorasInstalacaoMotor}
+                      onChange={(e) => setCompHorasInstalacaoMotor(Number(e.target.value))}
+                      className="w-full bg-slate-1000 border border-emerald-500/55 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-100 font-mono transition-colors"
+                    />
+                  </div>
+                )}
+
+                {compSistema === 'helice' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-400 mb-1.5">
+                      Horas Totais da Hélice na Instalação *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={compHorasInstalacaoHelice}
+                      onChange={(e) => setCompHorasInstalacaoHelice(Number(e.target.value))}
+                      className="w-full bg-slate-1000 border border-amber-500/55 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-slate-100 font-mono transition-colors"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">
                       Data Última Revisão * {compCondicao === 'novo' && <span className="text-[10px] text-emerald-400 italic">(Igual à Instalação para Novo)</span>}
@@ -943,17 +1072,24 @@ export default function AeronaveDetail({
                       }`}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Horas Totais do Componente *</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={compUltimaRevisaoHoras}
-                      onChange={(e) => setCompUltimaRevisaoHoras(Number(e.target.value))}
-                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-105 font-mono transition-colors"
-                    />
-                  </div>
+                   <div>
+                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                       Horas Totais do Componente * {compCondicao === 'novo' && <span className="text-[10px] text-emerald-400 italic">(0 horas para Novo)</span>}
+                     </label>
+                     <input
+                       type="number"
+                       step="0.1"
+                       required
+                       disabled={compCondicao === 'novo'}
+                       value={compUltimaRevisaoHoras}
+                       onChange={(e) => setCompUltimaRevisaoHoras(Number(e.target.value))}
+                       className={`w-full border rounded-xl px-4 py-3 text-sm focus:outline-none text-slate-100 font-mono transition-colors ${
+                         compCondicao === 'novo'
+                           ? 'bg-slate-950 border-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                           : 'bg-slate-1000 border-slate-700 focus:border-sky-500'
+                       }`}
+                     />
+                   </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1109,13 +1245,21 @@ export default function AeronaveDetail({
                             <td className="p-4">
                               <div className="space-y-0.5 text-slate-300">
                                 <div>{formatDataBR(c.dataInstalacao)}</div>
-                                <div className="text-slate-500 text-[10px] font-mono">Com {c.horasInstalacao} hs voo</div>
+                                <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
+                                  <div>Célula: <strong className="text-slate-300">{c.horasInstalacao || 0} hs</strong></div>
+                                  {c.sistema === 'motor' && (
+                                    <div>Motor: <strong className="text-emerald-400">{c.horasInstalacaoMotor || 0} hs</strong></div>
+                                  )}
+                                  {c.sistema === 'helice' && (
+                                    <div>Hélice: <strong className="text-amber-400">{c.horasInstalacaoHelice || 0} hs</strong></div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="p-4">
                               <div className="space-y-0.5 text-slate-300">
-                                <div>{formatDataBR(c.ultimaRevisaoData)}</div>
-                                <div className="text-slate-500 text-[10px] font-mono">Aos {c.ultimaRevisaoHoras} hs voo</div>
+                                <div>{formatDataBR(c.ultimaRevisaoData || c.dataInstalacao)}</div>
+                                <div className="text-slate-500 text-[10px] font-mono">Aos {c.horasInstalacao} hs voo</div>
                               </div>
                             </td>
                             <td className="p-4 text-right">

@@ -29,11 +29,23 @@ export function diferencaDias(dataFimISO: string, dataInicioISO: string): number
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
+// Retorna a data de hoje no formato YYYY-MM-DD considerando o fuso horário local
+export function obterDataHojeISO(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Computa a data atual padrão
+const DATA_ATUAL_PADRAO = obterDataHojeISO();
+
 // Calcula alertas detalhados para um determinado componente
 export function calcularAlerta(
   comp: ComponenteControlado,
   aero: Aeronave,
-  dataAtualISO: string = '2026-06-16'
+  dataAtualISO: string = DATA_ATUAL_PADRAO
 ): AlertaManutencao {
   const { limiteHoras, limiteDias, ultimaRevisaoHoras, ultimaRevisaoData, horasInstalacao, sistema, dataInstalacao, condicao } = comp;
   
@@ -156,7 +168,7 @@ export function calcularAlerta(
 export function calcularTodosAlertas(
   componentes: ComponenteControlado[],
   aero: Aeronave,
-  dataAtualISO: string = '2026-06-16'
+  dataAtualISO: string = DATA_ATUAL_PADRAO
 ): AlertaManutencao[] {
   return componentes.map(c => calcularAlerta(c, aero, dataAtualISO));
 }

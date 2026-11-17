@@ -221,6 +221,7 @@ export async function initDb() {
           ultima_revisao_data VARCHAR(20),
           nome_anexo VARCHAR(255),
           dados_anexo TEXT,
+          anexos TEXT,
           marca VARCHAR(255),
           condicao VARCHAR(50),
           oficina_executante VARCHAR(255),
@@ -232,6 +233,7 @@ export async function initDb() {
         -- Garante suporte a evolução do schema caso a tabela já exista
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS nome_anexo VARCHAR(255);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS dados_anexo TEXT;
+        ALTER TABLE componentes ADD COLUMN IF NOT EXISTS anexos TEXT;
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS marca VARCHAR(255);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS condicao VARCHAR(50);
         ALTER TABLE componentes ADD COLUMN IF NOT EXISTS oficina_executante VARCHAR(255);
@@ -536,28 +538,46 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
     }
     query += ' ORDER BY nome ASC';
     const res = await p.query(query, params);
-    return res.rows.map(row => ({
-      id: row.id,
-      aeronaveId: row.aeronave_id,
-      nome: row.nome,
-      partNumber: row.part_number,
-      serialNumber: row.serial_number,
-      limiteHoras: Number(row.limite_horas),
-      limiteDias: Number(row.limite_dias),
-      horasInstalacao: Number(row.horas_instalacao),
-      horasInstalacaoMotor: Number(row.horas_instalacao_motor || 0),
-      horasInstalacaoHelice: Number(row.horas_instalacao_helice || 0),
-      dataInstalacao: row.data_instalacao,
-      ultimaRevisaoHoras: Number(row.ultima_revisao_horas),
-      ultimaRevisaoData: row.ultima_revisao_data,
-      nomeAnexo: row.nome_anexo || undefined,
-      dadosAnexo: row.dados_anexo || undefined,
-      marca: row.marca || undefined,
-      condicao: (row.condicao as 'novo' | 'overhaul') || undefined,
-      oficinaExecutante: row.oficina_executante || undefined,
-      sistema: (row.sistema as 'celula' | 'motor' | 'helice') || 'celula',
-      created_at: row.created_at
-    }));
+    return res.rows.map(row => {
+      let anexosList: { nome: string; dados: string }[] = [];
+      if (row.anexos) {
+        try {
+          const parsed = typeof row.anexos === 'string' ? JSON.parse(row.anexos) : row.anexos;
+          if (Array.isArray(parsed)) {
+            anexosList = parsed.filter((a: any) => a && a.nome && a.dados);
+          }
+        } catch {
+          anexosList = [];
+        }
+      }
+      if (anexosList.length === 0 && row.nome_anexo && row.dados_anexo) {
+        anexosList = [{ nome: row.nome_anexo, dados: row.dados_anexo }];
+      }
+
+      return {
+        id: row.id,
+        aeronaveId: row.aeronave_id,
+        nome: row.nome,
+        partNumber: row.part_number,
+        serialNumber: row.serial_number,
+        limiteHoras: Number(row.limite_horas),
+        limiteDias: Number(row.limite_dias),
+        horasInstalacao: Number(row.horas_instalacao),
+        horasInstalacaoMotor: Number(row.horas_instalacao_motor || 0),
+        horasInstalacaoHelice: Number(row.horas_instalacao_helice || 0),
+        dataInstalacao: row.data_instalacao,
+        ultimaRevisaoHoras: Number(row.ultima_revisao_horas),
+        ultimaRevisaoData: row.ultima_revisao_data,
+        nomeAnexo: row.nome_anexo || (anexosList[0]?.nome ?? undefined),
+        dadosAnexo: row.dados_anexo || (anexosList[0]?.dados ?? undefined),
+        anexos: anexosList,
+        marca: row.marca || undefined,
+        condicao: (row.condicao as 'novo' | 'overhaul') || undefined,
+        oficinaExecutante: row.oficina_executante || undefined,
+        sistema: (row.sistema as 'celula' | 'motor' | 'helice') || 'celula',
+        created_at: row.created_at
+      };
+    });
   } catch (err: any) {
     setDbConnectionError('Erro na consulta de componentes: ' + err.message);
     throw err;
@@ -567,13 +587,25 @@ export async function getComponentes(aeronaveId?: string): Promise<ComponenteCon
 export async function addComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, anexos, marca, condicao, oficinaExecutante, sistema } = comp;
+    const anexosList = Array.isArray(anexos)
+      ? anexos.filter(a => a && a.nome && a.dados)
+      : (nomeAnexo && dadosAnexo ? [{ nome: nomeAnexo, dados: dadosAnexo }] : []);
+    const primaryNome = anexosList[0]?.nome || null;
+    const primaryDados = anexosList[0]?.dados || null;
+    const anexosJson = anexosList.length > 0 ? JSON.stringify(anexosList) : null;
+
     await p.query(
-      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, horas_instalacao_motor, horas_instalacao_helice, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, marca, condicao, oficina_executante, sistema)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
-      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula']
+      `INSERT INTO componentes (id, aeronave_id, nome, part_number, serial_number, limite_horas, limite_dias, horas_instalacao, horas_instalacao_motor, horas_instalacao_helice, data_instalacao, ultima_revisao_horas, ultima_revisao_data, nome_anexo, dados_anexo, anexos, marca, condicao, oficina_executante, sistema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+      [id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, primaryNome, primaryDados, anexosJson, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula']
     );
-    return comp;
+    return {
+      ...comp,
+      anexos: anexosList,
+      nomeAnexo: primaryNome || undefined,
+      dadosAnexo: primaryDados || undefined
+    };
   } catch (err: any) {
     setDbConnectionError('Erro ao adicionar componente: ' + err.message);
     throw err;
@@ -583,12 +615,24 @@ export async function addComponente(comp: ComponenteControlado): Promise<Compone
 export async function updateComponente(comp: ComponenteControlado): Promise<ComponenteControlado> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, marca, condicao, oficinaExecutante, sistema } = comp;
+    const { id, aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor, horasInstalacaoHelice, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo, dadosAnexo, anexos, marca, condicao, oficinaExecutante, sistema } = comp;
+    const anexosList = Array.isArray(anexos)
+      ? anexos.filter(a => a && a.nome && a.dados)
+      : (nomeAnexo && dadosAnexo ? [{ nome: nomeAnexo, dados: dadosAnexo }] : []);
+    const primaryNome = anexosList[0]?.nome || null;
+    const primaryDados = anexosList[0]?.dados || null;
+    const anexosJson = anexosList.length > 0 ? JSON.stringify(anexosList) : null;
+
     await p.query(
-      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, horas_instalacao_motor = $8, horas_instalacao_helice = $9, data_instalacao = $10, ultima_revisao_horas = $11, ultima_revisao_data = $12, nome_anexo = $13, dados_anexo = $14, marca = $15, condicao = $16, oficina_executante = $17, sistema = $18 WHERE id = $19`,
-      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, nomeAnexo || null, dadosAnexo || null, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula', id]
+      `UPDATE componentes SET aeronave_id = $1, nome = $2, part_number = $3, serial_number = $4, limite_horas = $5, limite_dias = $6, horas_instalacao = $7, horas_instalacao_motor = $8, horas_instalacao_helice = $9, data_instalacao = $10, ultima_revisao_horas = $11, ultima_revisao_data = $12, nome_anexo = $13, dados_anexo = $14, anexos = $15, marca = $16, condicao = $17, oficina_executante = $18, sistema = $19 WHERE id = $20`,
+      [aeronaveId, nome, partNumber, serialNumber, limiteHoras, limiteDias, horasInstalacao, horasInstalacaoMotor || 0, horasInstalacaoHelice || 0, dataInstalacao, ultimaRevisaoHoras, ultimaRevisaoData, primaryNome, primaryDados, anexosJson, marca || null, condicao || null, oficinaExecutante || null, sistema || 'celula', id]
     );
-    return comp;
+    return {
+      ...comp,
+      anexos: anexosList,
+      nomeAnexo: primaryNome || undefined,
+      dadosAnexo: primaryDados || undefined
+    };
   } catch (err: any) {
     setDbConnectionError('Erro ao atualizar componente: ' + err.message);
     throw err;

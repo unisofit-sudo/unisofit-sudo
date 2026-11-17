@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, RevisaoLaudo, AlertaManutencao } from '../types';
+import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, RevisaoLaudo, AlertaManutencao, AnexoComponente } from '../types';
 import { calcularAlerta, calcularTodosAlertas, formatDataBR } from '../utils';
 import {
   Wrench,
@@ -25,7 +25,8 @@ import {
   ShieldAlert,
   Paperclip,
   Activity,
-  FileSpreadsheet
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
 
 interface AeronaveDetailProps {
@@ -72,8 +73,7 @@ export default function AeronaveDetail({
   const [compDataInstalacao, setCompDataInstalacao] = useState(new Date().toISOString().split('T')[0]);
   const [compUltimaRevisaoHoras, setCompUltimaRevisaoHoras] = useState(0);
   const [compUltimaRevisaoData, setCompUltimaRevisaoData] = useState(new Date().toISOString().split('T')[0]);
-  const [compAttachmentName, setCompAttachmentName] = useState('');
-  const [compAttachmentData, setCompAttachmentData] = useState('');
+  const [compAttachments, setCompAttachments] = useState<AnexoComponente[]>([]);
   const [compMarca, setCompMarca] = useState('');
   const [compOficinaExecutante, setCompOficinaExecutante] = useState('');
   const [compCondicao, setCompCondicao] = useState<'novo' | 'overhaul'>('novo');
@@ -194,8 +194,9 @@ export default function AeronaveDetail({
       dataInstalacao: compDataInstalacao,
       ultimaRevisaoHoras: dbUltimaRevisaoHoras,
       ultimaRevisaoData: dbUltimaRevisaoData,
-      nomeAnexo: compAttachmentName || undefined,
-      dadosAnexo: compAttachmentData || undefined,
+      anexos: compAttachments,
+      nomeAnexo: compAttachments[0]?.nome || undefined,
+      dadosAnexo: compAttachments[0]?.dados || undefined,
       marca: compMarca.trim() || undefined,
       condicao: compCondicao,
       oficinaExecutante: compOficinaExecutante.trim() || undefined,
@@ -237,8 +238,13 @@ export default function AeronaveDetail({
     setCompUltimaRevisaoHoras(c.condicao === 'novo' ? 0 : c.ultimaRevisaoHoras);
 
     setCompUltimaRevisaoData(c.ultimaRevisaoData);
-    setCompAttachmentName(c.nomeAnexo || '');
-    setCompAttachmentData(c.dadosAnexo || '');
+    const initialAttachments: AnexoComponente[] =
+      c.anexos && c.anexos.length > 0
+        ? c.anexos
+        : c.nomeAnexo && c.dadosAnexo
+        ? [{ nome: c.nomeAnexo, dados: c.dadosAnexo }]
+        : [];
+    setCompAttachments(initialAttachments);
     setCompMarca(c.marca || '');
     setCompOficinaExecutante(c.oficinaExecutante || '');
     setCompCondicao(c.condicao || 'novo');
@@ -275,20 +281,29 @@ export default function AeronaveDetail({
   };
 
   const handleCompFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      alert('O arquivo selecionado excede o limite recomendado de 15MB para transferência.');
-      return;
+    const oversized = files.filter(f => f.size > 15 * 1024 * 1024);
+    if (oversized.length > 0) {
+      alert(`O(s) arquivo(s) ${oversized.map(f => f.name).join(', ')} excede(m) o limite recomendado de 15MB por arquivo e foi(ram) ignorado(s).`);
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCompAttachmentName(file.name);
-      setCompAttachmentData(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const validFiles = files.filter(f => f.size <= 15 * 1024 * 1024);
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const data = reader.result as string;
+        setCompAttachments(prev => [...prev, { nome: file.name, dados: data }]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveCompAttachment = (index: number) => {
+    setCompAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
   const openNovoComponente = () => {
@@ -305,8 +320,7 @@ export default function AeronaveDetail({
     setCompDataInstalacao(new Date().toISOString().split('T')[0]);
     setCompUltimaRevisaoHoras(0);
     setCompUltimaRevisaoData(new Date().toISOString().split('T')[0]);
-    setCompAttachmentName('');
-    setCompAttachmentData('');
+    setCompAttachments([]);
     setCompMarca('');
     setCompOficinaExecutante('');
     setCompCondicao('novo');
@@ -1092,11 +1106,14 @@ export default function AeronaveDetail({
                    </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Anexar Documento, Ficha Técnica ou Nota Fiscal (PDF ou Imagem)</label>
+                <div className="space-y-2.5">
+                  <label className="block text-xs font-semibold text-slate-400">
+                    Anexar Documentos, Fichas Técnicas ou Notas Fiscais (PDF ou Imagem)
+                  </label>
                   <div className="border border-dashed border-slate-700 rounded-xl p-5 bg-slate-950/20 text-center relative hover:bg-slate-950/40 transition-colors">
                     <input
                       type="file"
+                      multiple
                       accept=".pdf,image/*"
                       onChange={handleCompFileChange}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
@@ -1104,18 +1121,47 @@ export default function AeronaveDetail({
                     <div className="space-y-1">
                       <Upload className="w-6 h-6 text-slate-500 mx-auto" />
                       <p className="text-xs text-slate-300">
-                        {compAttachmentName ? (
-                          <strong className="text-slate-100 flex items-center justify-center gap-1">
-                            <Paperclip className="w-3.5 h-3.5 text-sky-400" />
-                            {compAttachmentName} (Alterar)
-                          </strong>
-                        ) : (
-                          'Clique ou arraste o arquivo aqui para fazer o upload'
-                        )}
+                        {compAttachments.length > 0
+                          ? `Clique ou arraste para adicionar mais arquivos (${compAttachments.length} ${compAttachments.length === 1 ? 'anexado' : 'anexados'})`
+                          : 'Clique ou arraste um ou mais arquivos aqui para fazer o upload'}
                       </p>
-                      <p className="text-[10px] text-slate-500">Tamanho máximo recomendado: 15MB</p>
+                      <p className="text-[10px] text-slate-500">Você pode selecionar vários arquivos. Tamanho máximo recomendado: 15MB por arquivo</p>
                     </div>
                   </div>
+
+                  {compAttachments.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      {compAttachments.map((anexo, index) => (
+                        <div
+                          key={`${anexo.nome}-${index}`}
+                          className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Paperclip className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                            <span className="text-slate-200 truncate">{anexo.nome}</span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <a
+                              href={anexo.dados}
+                              download={anexo.nome}
+                              className="p-1 text-slate-400 hover:text-sky-400 rounded-md hover:bg-slate-800 transition-colors"
+                              title="Baixar arquivo"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCompAttachment(index)}
+                              className="p-1 text-slate-400 hover:text-red-400 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Remover anexo"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
@@ -1203,18 +1249,31 @@ export default function AeronaveDetail({
                                     </span>
                                   )}
                                 </div>
-                                {c.nomeAnexo && c.dadosAnexo && (
-                                  <a
-                                    href={c.dadosAnexo}
-                                    download={c.nomeAnexo}
-                                    className="flex items-center gap-1 text-[10px] text-sky-400 font-medium hover:text-sky-350 transition-colors w-fit pl-5 mt-0.5"
-                                    title="Baixar Anexo do Componente"
-                                  >
-                                    <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                                    <span className="truncate max-w-[150px]">{c.nomeAnexo}</span>
-                                    <Download className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
-                                  </a>
-                                )}
+                                {(() => {
+                                  const compAnexos =
+                                    c.anexos && c.anexos.length > 0
+                                      ? c.anexos
+                                      : c.nomeAnexo && c.dadosAnexo
+                                      ? [{ nome: c.nomeAnexo, dados: c.dadosAnexo }]
+                                      : [];
+                                  return compAnexos.length > 0 ? (
+                                    <div className="flex flex-col gap-1 pl-5 mt-0.5">
+                                      {compAnexos.map((anexo, idx) => (
+                                        <a
+                                          key={`${anexo.nome}-${idx}`}
+                                          href={anexo.dados}
+                                          download={anexo.nome}
+                                          className="flex items-center gap-1 text-[10px] text-sky-400 font-medium hover:text-sky-350 transition-colors w-fit"
+                                          title={`Baixar ${anexo.nome}`}
+                                        >
+                                          <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                                          <span className="truncate max-w-[180px]">{anexo.nome}</span>
+                                          <Download className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  ) : null;
+                                })()}
                               </div>
                             </td>
                             <td className="p-4">

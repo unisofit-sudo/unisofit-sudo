@@ -35,9 +35,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Habilitar JSON de alta capacidade para suportar anexos em Base64
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  // Habilitar JSON de alta capacidade para suportar múltiplos anexos em Base64
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
   // Inicializar Banco de dados
   await initDb();

@@ -50,6 +50,11 @@ export interface HistoricoVoo {
   created_at?: string;
 }
 
+export interface AnexoComponente {
+  nome: string;
+  dados: string;
+}
+
 export interface ComponenteControlado {
   id: string;
   aeronaveId: string;
@@ -71,8 +76,9 @@ export interface ComponenteControlado {
   ultimaRevisaoHoras: number; // Horas de voo da aeronave na última revisão
   ultimaRevisaoData: string;  // Data da última revisão: YYYY-MM-DD
   
-  nomeAnexo?: string; // Nome do documento/imagem anexo
-  dadosAnexo?: string; // Conteúdo base64 do documento/imagem anexo
+  nomeAnexo?: string; // Nome do documento/imagem anexo (legado / principal)
+  dadosAnexo?: string; // Conteúdo base64 do documento/imagem anexo (legado / principal)
+  anexos?: AnexoComponente[]; // Lista de múltiplos documentos/imagens anexos
 
   marca?: string; // Marca / Fabricante do componente
   condicao?: 'novo' | 'overhaul'; // Condição do componente: novo ou overhaul

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ComponenteControlado, Aeronave, AlertaManutencao } from './types';
+import { ComponenteControlado, InspecaoPeriodica, Aeronave, AlertaManutencao } from './types';
 
 // Formata data formato brasileiro DD/MM/AAAA
 export function formatDataBR(dataISO: string | undefined): string {
@@ -171,4 +171,101 @@ export function calcularTodosAlertas(
   dataAtualISO: string = DATA_ATUAL_PADRAO
 ): AlertaManutencao[] {
   return componentes.map(c => calcularAlerta(c, aero, dataAtualISO));
+}
+
+// Calcula alertas detalhados para uma inspeção periódica
+export function calcularAlertaInspecao(
+  insp: InspecaoPeriodica,
+  aero: Aeronave,
+  dataAtualISO: string = DATA_ATUAL_PADRAO
+): AlertaManutencao {
+  const { limiteHoras, limiteDias, dataRealizacao, horasCelulaNaInspecao, horasMotorNaInspecao, sistema } = insp;
+
+  let horasLimite = 0;
+  let horasRestantes = 999999;
+
+  let horasLimiteCelula: number | undefined;
+  let horasLimiteMotor: number | undefined;
+  let horasRestantesCelula: number | undefined;
+  let horasRestantesMotor: number | undefined;
+
+  if (limiteHoras > 0) {
+    horasLimiteCelula = (horasCelulaNaInspecao || 0) + limiteHoras;
+    horasRestantesCelula = horasLimiteCelula - (aero.horasTotais || 0);
+
+    if (sistema === 'motor') {
+      horasLimiteMotor = (horasMotorNaInspecao || 0) + limiteHoras;
+      horasRestantesMotor = horasLimiteMotor - (aero.horasMotor || 0);
+      horasLimite = horasLimiteMotor;
+      horasRestantes = horasRestantesMotor;
+    } else {
+      horasLimite = horasLimiteCelula;
+      horasRestantes = horasRestantesCelula;
+    }
+  }
+
+  // Cálculo de dias
+  let diasRestantes = 999999;
+  let dataVencimento = '';
+
+  if (limiteDias > 0 && dataRealizacao) {
+    dataVencimento = adicionarDias(dataRealizacao, limiteDias);
+    diasRestantes = diferencaDias(dataVencimento, dataAtualISO);
+  }
+
+  let metric: 'horas' | 'dias' | 'ambas' = 'ambas';
+  if (limiteHoras > 0 && limiteDias === 0) metric = 'horas';
+  if (limiteHoras === 0 && limiteDias > 0) metric = 'dias';
+
+  let statusHoras: 'regular' | 'atencao' | 'critico' = 'regular';
+  if (limiteHoras > 0) {
+    if (horasRestantes <= 0 || horasRestantes <= (limiteHoras * 0.1)) {
+      statusHoras = 'critico';
+    } else if (horasRestantes <= (limiteHoras * 0.25)) {
+      statusHoras = 'atencao';
+    }
+  }
+
+  let statusDias: 'regular' | 'atencao' | 'critico' = 'regular';
+  if (limiteDias > 0) {
+    if (diasRestantes <= 0 || diasRestantes <= 15) {
+      statusDias = 'critico';
+    } else if (diasRestantes <= 45) {
+      statusDias = 'atencao';
+    }
+  }
+
+  let status: 'regular' | 'atencao' | 'critico' = 'regular';
+  if (statusHoras === 'critico' || statusDias === 'critico') {
+    status = 'critico';
+  } else if (statusHoras === 'atencao' || statusDias === 'atencao') {
+    status = 'atencao';
+  }
+
+  return {
+    idComponente: insp.id,
+    nomeComponente: insp.nome,
+    tipoItem: 'inspecao',
+    metric,
+    horasRestantes: limiteHoras > 0 ? horasRestantes : 0,
+    horasLimite,
+    horasUltima: sistema === 'motor' ? (horasMotorNaInspecao || 0) : (horasCelulaNaInspecao || 0),
+    diasRestantes: limiteDias > 0 ? diasRestantes : 0,
+    diasLimite: limiteDias,
+    dataUltima: dataRealizacao || '',
+    dataVencimento,
+    status,
+    horasLimiteCelula,
+    horasLimiteMotor,
+    horasRestantesCelula,
+    horasRestantesMotor
+  };
+}
+
+export function calcularTodosAlertasInspecoes(
+  inspecoes: InspecaoPeriodica[],
+  aero: Aeronave,
+  dataAtualISO: string = DATA_ATUAL_PADRAO
+): AlertaManutencao[] {
+  return inspecoes.map(i => calcularAlertaInspecao(i, aero, dataAtualISO));
 }

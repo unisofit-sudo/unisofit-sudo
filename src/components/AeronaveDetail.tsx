@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, RevisaoLaudo, AlertaManutencao, AnexoComponente } from '../types';
-import { calcularAlerta, calcularTodosAlertas, formatDataBR } from '../utils';
+import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, AlertaManutencao, AnexoComponente } from '../types';
+import { calcularAlerta, calcularTodosAlertas, calcularAlertaInspecao, calcularTodosAlertasInspecoes, formatDataBR, obterDataHojeISO } from '../utils';
 import {
   Wrench,
   Gauge,
@@ -26,7 +26,9 @@ import {
   Paperclip,
   Activity,
   FileSpreadsheet,
-  X
+  X,
+  Eye,
+  ClipboardCheck
 } from 'lucide-react';
 
 interface AeronaveDetailProps {
@@ -42,10 +44,11 @@ export default function AeronaveDetail({
   onRefreshAeronave,
   userRole
 }: AeronaveDetailProps) {
-  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'voos' | 'laudos'>('mapa');
+  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'inspecoes' | 'voos' | 'laudos'>('mapa');
   
   // Dados dinâmicos buscados do servidor
   const [componentes, setComponentes] = useState<ComponenteControlado[]>([]);
+  const [inspecoes, setInspecoes] = useState<InspecaoPeriodica[]>([]);
   const [voos, setVoos] = useState<HistoricoVoo[]>([]);
   const [revisoes, setRevisoes] = useState<RevisaoLaudo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,6 +87,20 @@ export default function AeronaveDetail({
     return aeronave.horasTotais || 0;
   };
 
+  // Formulário: Inspeções Periódicas
+  const [isInspFormOpen, setIsInspFormOpen] = useState(false);
+  const [inspEditing, setInspEditing] = useState<InspecaoPeriodica | null>(null);
+  const [inspNome, setInspNome] = useState('');
+  const [inspSistema, setInspSistema] = useState<'celula' | 'motor'>('celula');
+  const [inspConteudo, setInspConteudo] = useState('');
+  const [inspObservacao, setInspObservacao] = useState('');
+  const [inspLimiteHoras, setInspLimiteHoras] = useState(50);
+  const [inspLimiteDias, setInspLimiteDias] = useState(365);
+  const [inspDataRealizacao, setInspDataRealizacao] = useState(obterDataHojeISO());
+  const [inspHorasCelula, setInspHorasCelula] = useState(aeronave.horasTotais);
+  const [inspHorasMotor, setInspHorasMotor] = useState(aeronave.horasMotor || 0);
+  const [inspOficinaExecutante, setInspOficinaExecutante] = useState('');
+
   // Formulário: Nova Revisão / Carga de Laudo
   const [isRevFormOpen, setIsRevFormOpen] = useState(false);
   const [revData, setRevData] = useState(new Date().toISOString().split('T')[0]);
@@ -98,13 +115,15 @@ export default function AeronaveDetail({
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [compRes, voosRes, revRes] = await Promise.all([
+      const [compRes, inspRes, voosRes, revRes] = await Promise.all([
         fetch(`/api/componentes?aeronaveId=${aeronave.id}`),
+        fetch(`/api/inspecoes-periodicas?aeronaveId=${aeronave.id}`),
         fetch(`/api/historico?aeronaveId=${aeronave.id}`),
         fetch(`/api/revisoes?aeronaveId=${aeronave.id}`)
       ]);
       
       if (compRes.ok) setComponentes(await compRes.json());
+      if (inspRes.ok) setInspecoes(await inspRes.json());
       if (voosRes.ok) setVoos(await voosRes.json());
       if (revRes.ok) setRevisoes(await revRes.json());
     } catch (error) {
@@ -118,8 +137,10 @@ export default function AeronaveDetail({
     fetchData();
   }, [aeronave.id]);
 
-  // Calcula os alertas com base nas horas atuais da aeronave
-  const alertas = calcularTodosAlertas(componentes, aeronave);
+  // Calcula os alertas com base nas horas atuais da aeronave (Componentes + Inspeções Periódicas)
+  const alertasComponentes = calcularTodosAlertas(componentes, aeronave);
+  const alertasInspecoes = calcularTodosAlertasInspecoes(inspecoes, aeronave);
+  const alertas = [...alertasComponentes, ...alertasInspecoes];
   const alertasFiltrados = alertas.filter(a => {
     if (alertFilter === 'critico') return a.status === 'critico';
     if (alertFilter === 'atencao') return a.status === 'atencao';
@@ -327,6 +348,84 @@ export default function AeronaveDetail({
     setIsCompFormOpen(true);
   };
 
+  // --- SUBMISSÃO INSPEÇÕES PERIÓDICAS ---
+  const openNovaInspecao = () => {
+    setInspEditing(null);
+    setInspNome('');
+    setInspSistema('celula');
+    setInspConteudo('');
+    setInspObservacao('');
+    setInspLimiteHoras(50);
+    setInspLimiteDias(365);
+    setInspDataRealizacao(obterDataHojeISO());
+    setInspHorasCelula(aeronave.horasTotais);
+    setInspHorasMotor(aeronave.horasMotor || 0);
+    setInspOficinaExecutante('');
+    setIsInspFormOpen(true);
+  };
+
+  const handleEditInspecao = (insp: InspecaoPeriodica) => {
+    setInspEditing(insp);
+    setInspNome(insp.nome);
+    setInspSistema(insp.sistema || 'celula');
+    setInspConteudo(insp.conteudo || '');
+    setInspObservacao(insp.observacao || '');
+    setInspLimiteHoras(insp.limiteHoras || 0);
+    setInspLimiteDias(insp.limiteDias || 0);
+    setInspDataRealizacao(insp.dataRealizacao || obterDataHojeISO());
+    setInspHorasCelula(insp.horasCelulaNaInspecao || 0);
+    setInspHorasMotor(insp.horasMotorNaInspecao || 0);
+    setInspOficinaExecutante(insp.oficinaExecutante || '');
+    setIsInspFormOpen(true);
+  };
+
+  const handleSaveInspecao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inspNome.trim()) return;
+
+    const inspPayload = {
+      id: inspEditing?.id,
+      aeronaveId: aeronave.id,
+      nome: inspNome.trim(),
+      sistema: inspSistema,
+      conteudo: inspConteudo.trim(),
+      observacao: inspObservacao.trim() || undefined,
+      limiteHoras: Number(inspLimiteHoras || 0),
+      limiteDias: Number(inspLimiteDias || 0),
+      dataRealizacao: inspDataRealizacao,
+      horasCelulaNaInspecao: Number(inspHorasCelula || 0),
+      horasMotorNaInspecao: inspSistema === 'motor' ? Number(inspHorasMotor || 0) : 0,
+      oficinaExecutante: inspOficinaExecutante.trim() || undefined
+    };
+
+    try {
+      const method = inspEditing ? 'PUT' : 'POST';
+      const response = await fetch('/api/inspecoes-periodicas', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inspPayload)
+      });
+      if (response.ok) {
+        setIsInspFormOpen(false);
+        setInspEditing(null);
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteInspecao = async (id: string) => {
+    if (confirm('Deseja realmente remover esta inspeção periódica?')) {
+      try {
+        const res = await fetch(`/api/inspecoes-periodicas/${id}`, { method: 'DELETE' });
+        if (res.ok) fetchData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   // --- SUBMISSÃO REVISÃO / LAUDO ---
   const handleAddRevisao = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -445,6 +544,11 @@ export default function AeronaveDetail({
             <span>Componentes Monitorados: <strong>{componentes.length}</strong></span>
           </div>
 
+          <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
+            <span className="h-2 w-2 rounded-full bg-sky-500"></span>
+            <span>Inspeções Periódicas: <strong>{inspecoes.length}</strong></span>
+          </div>
+
           <button
             type="button"
             onClick={() => { setActiveTab('mapa'); setAlertFilter('critico'); }}
@@ -500,6 +604,18 @@ export default function AeronaveDetail({
         </button>
 
         <button
+          onClick={() => setActiveTab('inspecoes')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+            activeTab === 'inspecoes'
+              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+          }`}
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          Inspeções Periódicas ({inspecoes.length})
+        </button>
+
+        <button
           onClick={() => setActiveTab('voos')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
             activeTab === 'voos'
@@ -549,7 +665,7 @@ export default function AeronaveDetail({
                   onChange={(e) => setAlertFilter(e.target.value as any)}
                   className="bg-slate-950 border border-slate-700 hover:border-slate-600 rounded-xl text-xs px-3 py-2 text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
                 >
-                  <option value="todos">Todos Componentes</option>
+                  <option value="todos">Todos os Itens</option>
                   <option value="critico">⚠️ Vencidos ou Críticos</option>
                   <option value="atencao">⚡ Próximos do limite</option>
                 </select>
@@ -568,13 +684,20 @@ export default function AeronaveDetail({
             {alertasFiltrados.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-6 text-slate-400 text-xs font-mono">
                 {alertFilter === 'todos' 
-                  ? 'Nenhum componente cadastrado para emissão de alertas.'
-                  : 'Nenhum componente se enquadra no status selecionado.'}
+                  ? 'Nenhum componente ou inspeção periódica cadastrado para emissão de alertas.'
+                  : 'Nenhum item se enquadra no status selecionado.'}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-5">
                 {alertasFiltrados.map((al) => {
-                  const compOriginal = componentes.find(c => c.id === al.idComponente)!;
+                  const isInspecao = al.tipoItem === 'inspecao';
+                  const compOriginal = !isInspecao ? componentes.find(c => c.id === al.idComponente) : undefined;
+                  const inspOriginal = isInspecao ? inspecoes.find(i => i.id === al.idComponente) : undefined;
+                  if (!compOriginal && !inspOriginal) return null;
+
+                  const sistema = isInspecao ? inspOriginal!.sistema : compOriginal!.sistema;
+                  const limiteHoras = isInspecao ? inspOriginal!.limiteHoras : compOriginal!.limiteHoras;
+                  const limiteDias = isInspecao ? inspOriginal!.limiteDias : compOriginal!.limiteDias;
                   
                   // Detalhes estéticos conforme nível de risco
                   let cardBorderClass = 'border-slate-800 bg-slate-900/10';
@@ -596,56 +719,99 @@ export default function AeronaveDetail({
 
                   return (
                     <div
-                      key={al.idComponente}
+                      key={`${al.tipoItem || 'comp'}-${al.idComponente}`}
                       className={`border rounded-2xl p-5 ${cardBorderClass} flex flex-col md:flex-row justify-between gap-5 transition-all`}
                       id={`alert-card-${al.idComponente}`}
                     >
                       <div className="flex-1 space-y-3">
                         <div className="flex items-start justify-between md:justify-start gap-3">
                           <div>
-                            <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase mb-1.5 ${bgAlertClass}`}>
-                              {statusLabel}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${bgAlertClass}`}>
+                                {statusLabel}
+                              </span>
+                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                                isInspecao
+                                  ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                                  : 'bg-slate-800 text-slate-300 border-slate-700'
+                              }`}>
+                                {isInspecao ? 'Inspeção Periódica' : 'Componente'}
+                              </span>
+                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                                sistema === 'motor'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : sistema === 'helice'
+                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                  : 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                              }`}>
+                                {sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'}
+                              </span>
+                            </div>
                             <h4 className="font-display font-extrabold text-sm text-white tracking-tight leading-none">{al.nomeComponente}</h4>
-                            <p className="text-[10px] text-slate-400 mt-1.5">
-                              P/N: <strong className="text-slate-200">{compOriginal.partNumber || 'N/D'}</strong> • 
-                              S/N: <strong className="text-slate-200">{compOriginal.serialNumber || 'N/D'}</strong>
-                              {compOriginal.oficinaExecutante && (
-                                <> • Oficina: <strong className="text-emerald-400">{compOriginal.oficinaExecutante}</strong></>
-                              )}
-                            </p>
+                            {isInspecao && inspOriginal ? (
+                              <div className="text-[10px] text-slate-400 mt-1.5 space-y-0.5">
+                                {inspOriginal.oficinaExecutante && (
+                                  <p>Oficina: <strong className="text-emerald-400">{inspOriginal.oficinaExecutante}</strong></p>
+                                )}
+                                {inspOriginal.conteudo && (
+                                  <p className="text-slate-300 line-clamp-2">{inspOriginal.conteudo}</p>
+                                )}
+                                {inspOriginal.observacao && (
+                                  <p className="text-slate-400 italic line-clamp-1">Obs: {inspOriginal.observacao}</p>
+                                )}
+                              </div>
+                            ) : compOriginal ? (
+                              <p className="text-[10px] text-slate-400 mt-1.5">
+                                P/N: <strong className="text-slate-200">{compOriginal.partNumber || 'N/D'}</strong> • 
+                                S/N: <strong className="text-slate-200">{compOriginal.serialNumber || 'N/D'}</strong>
+                                {compOriginal.oficinaExecutante && (
+                                  <> • Oficina: <strong className="text-emerald-400">{compOriginal.oficinaExecutante}</strong></>
+                                )}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
 
                         {/* Dados de referência */}
                         <div className="grid grid-cols-2 gap-4 text-xs bg-slate-900/50 p-3.5 rounded-xl border border-slate-750/30">
                           <div>
-                            <span className="text-slate-405 text-[10px] block font-semibold mb-1">Última Revisão Realizada</span>
+                            <span className="text-slate-405 text-[10px] block font-semibold mb-1">
+                              {isInspecao ? 'Última Inspeção Realizada' : 'Última Revisão Realizada'}
+                            </span>
                             <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5 text-slate-500" />
                               {formatDataBR(al.dataUltima)}
                             </span>
-                            <span className="text-[10px] text-slate-505 italic block mt-0.5">
-                              Com {al.horasUltima.toFixed(1)} hs voo ({compOriginal.sistema === 'celula' ? 'Célula' : compOriginal.sistema === 'motor' ? 'Motor' : 'Hélice'})
-                            </span>
+                            {isInspecao && inspOriginal ? (
+                              <div className="text-[10px] text-slate-505 italic mt-0.5 space-y-0.5 font-mono">
+                                <div>Célula: {(inspOriginal.horasCelulaNaInspecao || 0).toFixed(1)} hs</div>
+                                {inspOriginal.sistema === 'motor' && (
+                                  <div className="text-emerald-400">Motor: {(inspOriginal.horasMotorNaInspecao || 0).toFixed(1)} hs</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-505 italic block mt-0.5">
+                                Com {al.horasUltima.toFixed(1)} hs voo ({sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})
+                              </span>
+                            )}
                           </div>
                           <div>
                             <span className="text-slate-405 text-[10px] block font-semibold mb-1">Vencimento Planejado</span>
-                            {compOriginal.limiteDias > 0 && al.dataVencimento && (
+                            {limiteDias > 0 && al.dataVencimento && (
                               <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                                 {formatDataBR(al.dataVencimento)}
                               </span>
                             )}
-                            {compOriginal.limiteHoras > 0 && (
+                            {limiteHoras > 0 && (
                               <div className="space-y-0.5 mt-1 font-mono">
-                                {compOriginal.sistema === 'celula' && al.horasLimiteCelula !== undefined && (
+                                {sistema === 'celula' && al.horasLimiteCelula !== undefined && (
                                   <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
                                     <Clock className="w-3.5 h-3.5 text-slate-500" />
                                     Célula: {al.horasLimiteCelula.toFixed(1)} hs
                                   </span>
                                 )}
-                                {compOriginal.sistema === 'motor' && (
+                                {sistema === 'motor' && (
                                   <>
                                     {al.horasLimiteCelula !== undefined && (
                                       <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
@@ -660,7 +826,7 @@ export default function AeronaveDetail({
                                     )}
                                   </>
                                 )}
-                                {compOriginal.sistema === 'helice' && (
+                                {sistema === 'helice' && (
                                   <>
                                     {al.horasLimiteCelula !== undefined && (
                                       <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
@@ -685,12 +851,12 @@ export default function AeronaveDetail({
                       <div className="w-full md:w-80 flex flex-col justify-center space-y-4 border-t pt-4 md:border-t-0 md:pt-0 border-slate-800/60">
                         
                         {/* Margem de Horas */}
-                        {(al.metric === 'horas' || al.metric === 'ambas') && (
+                        {(al.metric === 'horas' || al.metric === 'ambas') && limiteHoras > 0 && (
                           <div className="space-y-2">
                             <div className="flex flex-col space-y-1">
                               <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Margem por Horas de Voo</span>
                               
-                              {compOriginal.sistema === 'celula' && al.horasRestantesCelula !== undefined && (
+                              {sistema === 'celula' && al.horasRestantesCelula !== undefined && (
                                 <div className="flex justify-between text-xs font-semibold">
                                   <span className="text-slate-350">Célula:</span>
                                   <span className={textAlertClass}>
@@ -699,7 +865,7 @@ export default function AeronaveDetail({
                                 </div>
                               )}
                               
-                              {compOriginal.sistema === 'motor' && (
+                              {sistema === 'motor' && (
                                 <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
                                   {al.horasRestantesCelula !== undefined && (
                                     <div className="flex justify-between text-xs font-semibold">
@@ -720,7 +886,7 @@ export default function AeronaveDetail({
                                 </div>
                               )}
 
-                              {compOriginal.sistema === 'helice' && (
+                              {sistema === 'helice' && (
                                 <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
                                   {al.horasRestantesCelula !== undefined && (
                                     <div className="flex justify-between text-xs font-semibold">
@@ -746,18 +912,22 @@ export default function AeronaveDetail({
                             <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
                               <div
                                 className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.max(0, Math.min(100, (al.horasRestantes / compOriginal.limiteHoras) * 100))}%` }}
+                                style={{ width: `${Math.max(0, Math.min(100, (al.horasRestantes / limiteHoras) * 100))}%` }}
                               ></div>
                             </div>
                             <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
-                              <span>Instalado: {compOriginal.horasInstalacao} hs ({compOriginal.sistema === 'celula' ? 'Célula' : compOriginal.sistema === 'motor' ? 'Motor' : 'Hélice'})</span>
-                              <span>Intervalo: {compOriginal.limiteHoras} hs</span>
+                              <span>
+                                {isInspecao && inspOriginal
+                                  ? `Realizada: ${inspOriginal.sistema === 'motor' ? inspOriginal.horasMotorNaInspecao || 0 : inspOriginal.horasCelulaNaInspecao || 0} hs (${inspOriginal.sistema === 'motor' ? 'Motor' : 'Célula'})`
+                                  : `Instalado: ${compOriginal?.horasInstalacao || 0} hs (${sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})`}
+                              </span>
+                              <span>Intervalo: {limiteHoras} hs</span>
                             </div>
                           </div>
                         )}
 
                         {/* Margem de Dias */}
-                        {(al.metric === 'dias' || al.metric === 'ambas') && (
+                        {(al.metric === 'dias' || al.metric === 'ambas') && limiteDias > 0 && (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs font-semibold">
                               <span className="text-slate-400 text-[10px] uppercase font-bold">Margem Calendária (Dias)</span>
@@ -770,11 +940,11 @@ export default function AeronaveDetail({
                             <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
                               <div
                                 className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-400' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.max(0, Math.min(100, (al.diasRestantes / compOriginal.limiteDias) * 100))}%` }}
+                                style={{ width: `${Math.max(0, Math.min(100, (al.diasRestantes / limiteDias) * 100))}%` }}
                               ></div>
                             </div>
                             <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
-                              <span>Prazo: {compOriginal.limiteDias} dias</span>
+                              <span>Prazo: {limiteDias} dias</span>
                               <span>Vencimento: {formatDataBR(al.dataVencimento)}</span>
                             </div>
                           </div>
@@ -782,13 +952,26 @@ export default function AeronaveDetail({
 
                         {/* Botão Ação Rápida */}
                         <div className="pt-2 text-right">
-                          <button
-                            onClick={() => openRevisaoForComponente(compOriginal)}
-                            className="inline-flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-bold py-1.5 px-3 rounded-xl border border-sky-500/25 transition-all cursor-pointer"
-                          >
-                            <Wrench className="w-3.5 h-3.5" />
-                            Iniciar Revisão / Laudo
-                          </button>
+                          {isInspecao && inspOriginal ? (
+                            <button
+                              onClick={() => {
+                                handleEditInspecao(inspOriginal);
+                                setActiveTab('inspecoes');
+                              }}
+                              className="inline-flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold py-1.5 px-3 rounded-xl border border-indigo-500/25 transition-all cursor-pointer"
+                            >
+                              <ClipboardCheck className="w-3.5 h-3.5" />
+                              {userRole === 'oficina' ? 'Visualizar Inspeção' : 'Abrir / Atualizar Inspeção'}
+                            </button>
+                          ) : compOriginal ? (
+                            <button
+                              onClick={() => openRevisaoForComponente(compOriginal)}
+                              className="inline-flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-bold py-1.5 px-3 rounded-xl border border-sky-500/25 transition-all cursor-pointer"
+                            >
+                              <Wrench className="w-3.5 h-3.5" />
+                              Iniciar Revisão / Laudo
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -800,15 +983,19 @@ export default function AeronaveDetail({
         )}
 
         {!loading && activeTab === 'componentes' && (
-          isCompFormOpen ? (
+          isCompFormOpen ? (() => {
+            const isCompReadOnly = userRole === 'oficina';
+            return (
             <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
               <div className="flex justify-between items-center pb-4 border-b border-slate-850">
                 <div>
                   <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
                     <Wrench className="w-5 h-5 text-sky-400" />
-                    {compEditing ? 'Editar Componente' : 'Cadastrar Componente Controlado'}
+                    {isCompReadOnly ? 'Detalhes do Componente' : compEditing ? 'Editar Componente' : 'Cadastrar Componente Controlado'}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Preencha os dados do componente e seus limites de rastreamento.</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {isCompReadOnly ? 'Visualize os dados do componente e baixe os documentos anexados.' : 'Preencha os dados do componente e seus limites de rastreamento.'}
+                  </p>
                 </div>
                 <button
                   onClick={() => setIsCompFormOpen(false)}
@@ -819,6 +1006,7 @@ export default function AeronaveDetail({
               </div>
 
               <form onSubmit={handleSaveComponente} className="space-y-6">
+                <fieldset disabled={isCompReadOnly} className="space-y-6">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome do Componente ou Peça *</label>
@@ -1108,28 +1296,32 @@ export default function AeronaveDetail({
 
                 <div className="space-y-2.5">
                   <label className="block text-xs font-semibold text-slate-400">
-                    Anexar Documentos, Fichas Técnicas ou Notas Fiscais (PDF ou Imagem)
+                    {isCompReadOnly
+                      ? 'Documentos, Fichas Técnicas ou Notas Fiscais Anexados'
+                      : 'Anexar Documentos, Fichas Técnicas ou Notas Fiscais (PDF ou Imagem)'}
                   </label>
-                  <div className="border border-dashed border-slate-700 rounded-xl p-5 bg-slate-950/20 text-center relative hover:bg-slate-950/40 transition-colors">
-                    <input
-                      type="file"
-                      multiple
-                      accept=".pdf,image/*"
-                      onChange={handleCompFileChange}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                    />
-                    <div className="space-y-1">
-                      <Upload className="w-6 h-6 text-slate-500 mx-auto" />
-                      <p className="text-xs text-slate-300">
-                        {compAttachments.length > 0
-                          ? `Clique ou arraste para adicionar mais arquivos (${compAttachments.length} ${compAttachments.length === 1 ? 'anexado' : 'anexados'})`
-                          : 'Clique ou arraste um ou mais arquivos aqui para fazer o upload'}
-                      </p>
-                      <p className="text-[10px] text-slate-500">Você pode selecionar vários arquivos. Tamanho máximo recomendado: 15MB por arquivo</p>
+                  {!isCompReadOnly && (
+                    <div className="border border-dashed border-slate-700 rounded-xl p-5 bg-slate-950/20 text-center relative hover:bg-slate-950/40 transition-colors">
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,image/*"
+                        onChange={handleCompFileChange}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      <div className="space-y-1">
+                        <Upload className="w-6 h-6 text-slate-500 mx-auto" />
+                        <p className="text-xs text-slate-300">
+                          {compAttachments.length > 0
+                            ? `Clique ou arraste para adicionar mais arquivos (${compAttachments.length} ${compAttachments.length === 1 ? 'anexado' : 'anexados'})`
+                            : 'Clique ou arraste um ou mais arquivos aqui para fazer o upload'}
+                        </p>
+                        <p className="text-[10px] text-slate-500">Você pode selecionar vários arquivos. Tamanho máximo recomendado: 15MB por arquivo</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {compAttachments.length > 0 && (
+                  {compAttachments.length > 0 ? (
                     <div className="space-y-1.5 pt-1">
                       {compAttachments.map((anexo, index) => (
                         <div
@@ -1149,20 +1341,25 @@ export default function AeronaveDetail({
                             >
                               <Download className="w-3.5 h-3.5" />
                             </a>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCompAttachment(index)}
-                              className="p-1 text-slate-400 hover:text-red-400 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
-                              title="Remover anexo"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            {!isCompReadOnly && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCompAttachment(index)}
+                                className="p-1 text-slate-400 hover:text-red-400 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="Remover anexo"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
-                  )}
+                  ) : isCompReadOnly ? (
+                    <p className="text-xs text-slate-500 italic py-2">Nenhum documento anexado a este componente.</p>
+                  ) : null}
                 </div>
+                </fieldset>
 
                 <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
                   <button
@@ -1170,18 +1367,21 @@ export default function AeronaveDetail({
                     onClick={() => setIsCompFormOpen(false)}
                     className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
                   >
-                    Cancelar
+                    {isCompReadOnly ? 'Fechar' : 'Cancelar'}
                   </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-lg shadow-sky-500/10"
-                  >
-                    {compEditing ? 'Salvar Edição' : 'Cadastrar Componente'}
-                  </button>
+                  {!isCompReadOnly && (
+                    <button
+                      type="submit"
+                      className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-lg shadow-sky-500/10"
+                    >
+                      {compEditing ? 'Salvar Edição' : 'Cadastrar Componente'}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
-          ) : (
+            );
+          })() : (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1222,58 +1422,38 @@ export default function AeronaveDetail({
                         return (
                           <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
                             <td className="p-4 font-semibold text-white">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
-                                    alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
-                                  }`} title={`Status: ${alerta.status}`}></span>
-                                  <span>{c.nome}</span>
-                                  {c.condicao && (
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
-                                      c.condicao === 'novo'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                                    }`}>
-                                      {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
-                                    </span>
-                                  )}
-                                  {c.sistema && (
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
-                                      c.sistema === 'motor'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : c.sistema === 'helice'
-                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                        : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                                    }`}>
-                                      {c.sistema === 'celula' ? 'Célula' : c.sistema === 'motor' ? 'Motor' : 'Hélice'}
-                                    </span>
-                                  )}
-                                </div>
-                                {(() => {
-                                  const compAnexos =
-                                    c.anexos && c.anexos.length > 0
-                                      ? c.anexos
-                                      : c.nomeAnexo && c.dadosAnexo
-                                      ? [{ nome: c.nomeAnexo, dados: c.dadosAnexo }]
-                                      : [];
-                                  return compAnexos.length > 0 ? (
-                                    <div className="flex flex-col gap-1 pl-5 mt-0.5">
-                                      {compAnexos.map((anexo, idx) => (
-                                        <a
-                                          key={`${anexo.nome}-${idx}`}
-                                          href={anexo.dados}
-                                          download={anexo.nome}
-                                          className="flex items-center gap-1 text-[10px] text-sky-400 font-medium hover:text-sky-350 transition-colors w-fit"
-                                          title={`Baixar ${anexo.nome}`}
-                                        >
-                                          <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                                          <span className="truncate max-w-[180px]">{anexo.nome}</span>
-                                          <Download className="w-2.5 h-2.5 text-sky-400 flex-shrink-0" />
-                                        </a>
-                                      ))}
-                                    </div>
-                                  ) : null;
-                                })()}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
+                                  alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                                }`} title={`Status: ${alerta.status}`}></span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditComponente(c)}
+                                  className="text-left hover:text-sky-400 transition-colors cursor-pointer"
+                                  title="Abrir componente e anexos"
+                                >
+                                  {c.nome}
+                                </button>
+                                {c.condicao && (
+                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                    c.condicao === 'novo'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                  }`}>
+                                    {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
+                                  </span>
+                                )}
+                                {c.sistema && (
+                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                    c.sistema === 'motor'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : c.sistema === 'helice'
+                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                  }`}>
+                                    {c.sistema === 'celula' ? 'Célula' : c.sistema === 'motor' ? 'Motor' : 'Hélice'}
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td className="p-4">
@@ -1330,7 +1510,15 @@ export default function AeronaveDetail({
                                 >
                                   <Upload className="w-3.5 h-3.5" />
                                 </button>
-                                {userRole !== 'oficina' && (
+                                {userRole === 'oficina' ? (
+                                  <button
+                                    onClick={() => handleEditComponente(c)}
+                                    className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                    title="Visualizar Componente e Anexos"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
                                   <>
                                     <button
                                       onClick={() => handleEditComponente(c)}
@@ -1341,6 +1529,352 @@ export default function AeronaveDetail({
                                     </button>
                                     <button
                                       onClick={() => handleDeleteComponente(c.id)}
+                                      className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        )}
+
+        {/* --- TAB: INSPEÇÕES PERIÓDICAS --- */}
+        {!loading && activeTab === 'inspecoes' && (
+          isInspFormOpen ? (() => {
+            const isInspReadOnly = userRole === 'oficina';
+            return (
+              <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
+                <div className="flex justify-between items-center pb-4 border-b border-slate-850">
+                  <div>
+                    <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
+                      <ClipboardCheck className="w-5 h-5 text-sky-400" />
+                      {isInspReadOnly ? 'Detalhes da Inspeção Periódica' : inspEditing ? 'Editar Inspeção Periódica' : 'Cadastrar Inspeção Periódica'}
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {isInspReadOnly
+                        ? 'Visualize os detalhes, horas registradas e prazos da inspeção.'
+                        : 'Configure a inspeção periódica associada à célula ou ao motor e seus limites de controle.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsInspFormOpen(false)}
+                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-800"
+                  >
+                    ✕ Voltar
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveInspecao} className="space-y-6">
+                  <fieldset disabled={isInspReadOnly} className="space-y-6">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome da Inspeção *</label>
+                        <input
+                          type="text"
+                          required
+                          value={inspNome}
+                          onChange={(e) => setInspNome(e.target.value)}
+                          placeholder="Ex: Inspeção de 50 Horas, Inspeção de 100 Horas, IAM / CVA"
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-medium placeholder-slate-600 transition-colors"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Esta inspeção está associada a: *</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                            inspSistema === 'celula'
+                              ? 'bg-sky-500/10 border-sky-500/50 text-white shadow-md shadow-sky-500/5'
+                              : 'bg-slate-1000 border-slate-750 text-slate-400 hover:border-slate-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="inspSistema"
+                              value="celula"
+                              checked={inspSistema === 'celula'}
+                              onChange={() => setInspSistema('celula')}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${inspSistema === 'celula' ? 'border-sky-500' : 'border-slate-600'}`}>
+                              {inspSistema === 'celula' && <div className="w-2 h-2 rounded-full bg-sky-500" />}
+                            </div>
+                            <span className="text-xs font-semibold">Célula</span>
+                          </label>
+
+                          <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                            inspSistema === 'motor'
+                              ? 'bg-emerald-500/10 border-emerald-500/50 text-white shadow-md shadow-emerald-500/5'
+                              : 'bg-slate-1000 border-slate-750 text-slate-400 hover:border-slate-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="inspSistema"
+                              value="motor"
+                              checked={inspSistema === 'motor'}
+                              onChange={() => setInspSistema('motor')}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${inspSistema === 'motor' ? 'border-emerald-500' : 'border-slate-600'}`}>
+                              {inspSistema === 'motor' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                            </div>
+                            <span className="text-xs font-semibold">Motor</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Conteúdo da Inspeção *</label>
+                        <textarea
+                          required
+                          rows={3}
+                          value={inspConteudo}
+                          onChange={(e) => setInspConteudo(e.target.value)}
+                          placeholder="Descreva os itens verificados, serviços e procedimentos desta inspeção..."
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors resize-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Observação</label>
+                        <textarea
+                          rows={2}
+                          value={inspObservacao}
+                          onChange={(e) => setInspObservacao(e.target.value)}
+                          placeholder="Observações adicionais, recomendações ou pendências..."
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/50 p-5 rounded-xl space-y-4 border border-slate-800">
+                      <p className="text-[10px] uppercase font-bold tracking-widest text-sky-400 font-mono">Parâmetros de Limites e Vencimentos</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Limite por Horas</label>
+                          <input
+                            type="number"
+                            value={inspLimiteHoras}
+                            onChange={(e) => setInspLimiteHoras(Number(e.target.value))}
+                            min={0}
+                            className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                          />
+                          <span className="text-[9px] text-slate-500 italic mt-1.5 block leading-normal">Zere se não for controlada por horas</span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 mb-1.5">Limite por Dias</label>
+                          <input
+                            type="number"
+                            value={inspLimiteDias}
+                            onChange={(e) => setInspLimiteDias(Number(e.target.value))}
+                            min={0}
+                            className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                          />
+                          <span className="text-[9px] text-slate-500 italic mt-1.5 block leading-normal">Zere se não houver validade temporal</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data em que foi feita *</label>
+                        <input
+                          type="date"
+                          required
+                          value={inspDataRealizacao}
+                          onChange={(e) => setInspDataRealizacao(e.target.value)}
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">Oficina que fez</label>
+                        <input
+                          type="text"
+                          value={inspOficinaExecutante}
+                          onChange={(e) => setInspOficinaExecutante(e.target.value)}
+                          placeholder="Ex: Oficina Aero Sol, Hangar 12"
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className={`grid grid-cols-1 ${inspSistema === 'motor' ? 'sm:grid-cols-2' : ''} gap-5`}>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                          Horas Totais de Célula na Inspeção *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          required
+                          value={inspHorasCelula}
+                          onChange={(e) => setInspHorasCelula(Number(e.target.value))}
+                          className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono transition-colors"
+                        />
+                      </div>
+
+                      {inspSistema === 'motor' && (
+                        <div>
+                          <label className="block text-xs font-semibold text-emerald-400 mb-1.5">
+                            Horas Totais de Motor na Inspeção *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            required
+                            value={inspHorasMotor}
+                            onChange={(e) => setInspHorasMotor(Number(e.target.value))}
+                            className="w-full bg-slate-1000 border border-emerald-500/55 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-100 font-mono transition-colors"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </fieldset>
+
+                  <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsInspFormOpen(false)}
+                      className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                    >
+                      {isInspReadOnly ? 'Fechar' : 'Cancelar'}
+                    </button>
+                    {!isInspReadOnly && (
+                      <button
+                        type="submit"
+                        className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-650 rounded-xl transition-colors cursor-pointer shadow-lg shadow-sky-500/10"
+                      >
+                        {inspEditing ? 'Salvar Edição' : 'Cadastrar Inspeção'}
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            );
+          })() : (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight">Inspeções Periódicas</h3>
+                  <p className="text-xs text-slate-400">Cadastre as inspeções periódicas de célula e motor para controle automático no mapa de alertas.</p>
+                </div>
+                {userRole !== 'oficina' && (
+                  <button
+                    onClick={openNovaInspecao}
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Cadastrar Inspeção
+                  </button>
+                )}
+              </div>
+
+              {inspecoes.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
+                  Nenhuma inspeção periódica cadastrada nesta aeronave. Clique no botão acima para adicionar!
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
+                        <th className="p-4">Inspeção</th>
+                        <th className="p-4">Conteúdo / Observação</th>
+                        <th className="p-4">Limites Fixados</th>
+                        <th className="p-4">Última Realização</th>
+                        <th className="p-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                      {inspecoes.map((insp) => {
+                        const alerta = calcularAlertaInspecao(insp, aeronave);
+                        return (
+                          <tr key={insp.id} className="hover:bg-slate-850/40 transition-colors" id={`insp-row-${insp.id}`}>
+                            <td className="p-4 font-semibold text-white">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
+                                  alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                                }`} title={`Status: ${alerta.status}`}></span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditInspecao(insp)}
+                                  className="text-left hover:text-sky-400 transition-colors cursor-pointer"
+                                  title="Abrir detalhes da inspeção"
+                                >
+                                  {insp.nome}
+                                </button>
+                                <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                  insp.sistema === 'motor'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                }`}>
+                                  {insp.sistema === 'motor' ? 'Motor' : 'Célula'}
+                                </span>
+                              </div>
+                              {insp.oficinaExecutante && (
+                                <div className="text-[10px] text-emerald-400 font-normal mt-1 pl-4">
+                                  Oficina: <strong className="font-semibold text-slate-200">{insp.oficinaExecutante}</strong>
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-4 max-w-xs">
+                              <div className="space-y-1">
+                                <p className="text-slate-200 line-clamp-2">{insp.conteudo || '-'}</p>
+                                {insp.observacao && (
+                                  <p className="text-[10px] text-slate-400 italic line-clamp-1">Obs: {insp.observacao}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-4 font-semibold text-slate-200">
+                              <div className="space-y-0.5">
+                                {insp.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {insp.limiteHoras} hs voo</div>}
+                                {insp.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {insp.limiteDias} dias can.</div>}
+                                {insp.limiteHoras === 0 && insp.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-0.5 text-slate-300">
+                                <div>{formatDataBR(insp.dataRealizacao)}</div>
+                                <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
+                                  <div>Célula: <strong className="text-slate-300">{insp.horasCelulaNaInspecao || 0} hs</strong></div>
+                                  {insp.sistema === 'motor' && (
+                                    <div>Motor: <strong className="text-emerald-400">{insp.horasMotorNaInspecao || 0} hs</strong></div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {userRole === 'oficina' ? (
+                                  <button
+                                    onClick={() => handleEditInspecao(insp)}
+                                    className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                    title="Visualizar Inspeção"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditInspecao(insp)}
+                                      className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                      title="Editar"
+                                    >
+                                      <History className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteInspecao(insp.id)}
                                       className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
                                       title="Excluir"
                                     >

@@ -101,10 +101,27 @@ export interface RevisaoLaudo {
   created_at?: string;
 }
 
+export interface InspecaoPeriodica {
+  id: string;
+  aeronaveId: string;
+  nome: string;
+  sistema: 'celula' | 'motor';
+  conteudo: string;
+  observacao?: string;
+  limiteHoras: number;
+  limiteDias: number;
+  dataRealizacao: string; // YYYY-MM-DD
+  horasCelulaNaInspecao: number;
+  horasMotorNaInspecao?: number;
+  oficinaExecutante?: string;
+  created_at?: string;
+}
+
 // Interface para Alertas Calculados
 export interface AlertaManutencao {
   idComponente: string;
   nomeComponente: string;
+  tipoItem?: 'componente' | 'inspecao';
   metric: 'horas' | 'dias' | 'ambas';
   
   // Horas

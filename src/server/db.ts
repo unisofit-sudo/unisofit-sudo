@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, RevisaoLaudo, UsuarioOficina } from '../types';
+import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, UsuarioOficina } from '../types';
 
 let pool: Pool | null = null;
 let dbConnectionError: string | null = null;
@@ -270,6 +270,23 @@ export async function initDb() {
           prazo_acesso VARCHAR(20),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_cliente_oficina FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS inspecoes_periodicas (
+          id VARCHAR(100) PRIMARY KEY,
+          aeronave_id VARCHAR(100) NOT NULL,
+          nome VARCHAR(255) NOT NULL,
+          sistema VARCHAR(50) DEFAULT 'celula',
+          conteudo TEXT,
+          observacao TEXT,
+          limite_horas DOUBLE PRECISION DEFAULT 0,
+          limite_dias INTEGER DEFAULT 0,
+          data_realizacao VARCHAR(20),
+          horas_celula_na_inspecao DOUBLE PRECISION DEFAULT 0,
+          horas_motor_na_inspecao DOUBLE PRECISION DEFAULT 0,
+          oficina_executante VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_aeronave_insp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
 
         -- Executa migrações automáticas de dados dos componentes para representação direta
@@ -796,3 +813,132 @@ export async function deleteUsuarioOficina(id: string): Promise<void> {
     throw err;
   }
 }
+
+// INSPEÇÕES PERIÓDICAS
+export async function getInspecoesPeriodicas(aeronaveId?: string): Promise<InspecaoPeriodica[]> {
+  try {
+    const p = checkPool();
+    let query = 'SELECT * FROM inspecoes_periodicas';
+    const params: any[] = [];
+    if (aeronaveId) {
+      query += ' WHERE aeronave_id = $1';
+      params.push(aeronaveId);
+    }
+    query += ' ORDER BY nome ASC';
+    const res = await p.query(query, params);
+    return res.rows.map(row => ({
+      id: row.id,
+      aeronaveId: row.aeronave_id,
+      nome: row.nome,
+      sistema: (row.sistema as 'celula' | 'motor') || 'celula',
+      conteudo: row.conteudo || '',
+      observacao: row.observacao || undefined,
+      limiteHoras: Number(row.limite_horas || 0),
+      limiteDias: Number(row.limite_dias || 0),
+      dataRealizacao: row.data_realizacao || '',
+      horasCelulaNaInspecao: Number(row.horas_celula_na_inspecao || 0),
+      horasMotorNaInspecao: row.horas_motor_na_inspecao !== null && row.horas_motor_na_inspecao !== undefined ? Number(row.horas_motor_na_inspecao) : 0,
+      oficinaExecutante: row.oficina_executante || undefined,
+      created_at: row.created_at
+    }));
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de inspeções periódicas: ' + err.message);
+    throw err;
+  }
+}
+
+export async function addInspecaoPeriodica(insp: InspecaoPeriodica): Promise<InspecaoPeriodica> {
+  try {
+    const p = checkPool();
+    const {
+      id,
+      aeronaveId,
+      nome,
+      sistema,
+      conteudo,
+      observacao,
+      limiteHoras,
+      limiteDias,
+      dataRealizacao,
+      horasCelulaNaInspecao,
+      horasMotorNaInspecao,
+      oficinaExecutante
+    } = insp;
+
+    await p.query(
+      `INSERT INTO inspecoes_periodicas (id, aeronave_id, nome, sistema, conteudo, observacao, limite_horas, limite_dias, data_realizacao, horas_celula_na_inspecao, horas_motor_na_inspecao, oficina_executante)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        id,
+        aeronaveId,
+        nome,
+        sistema || 'celula',
+        conteudo || '',
+        observacao || null,
+        limiteHoras || 0,
+        limiteDias || 0,
+        dataRealizacao || '',
+        horasCelulaNaInspecao || 0,
+        sistema === 'motor' ? (horasMotorNaInspecao || 0) : 0,
+        oficinaExecutante || null
+      ]
+    );
+    return insp;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar inspeção periódica: ' + err.message);
+    throw err;
+  }
+}
+
+export async function updateInspecaoPeriodica(insp: InspecaoPeriodica): Promise<InspecaoPeriodica> {
+  try {
+    const p = checkPool();
+    const {
+      id,
+      aeronaveId,
+      nome,
+      sistema,
+      conteudo,
+      observacao,
+      limiteHoras,
+      limiteDias,
+      dataRealizacao,
+      horasCelulaNaInspecao,
+      horasMotorNaInspecao,
+      oficinaExecutante
+    } = insp;
+
+    await p.query(
+      `UPDATE inspecoes_periodicas SET aeronave_id = $1, nome = $2, sistema = $3, conteudo = $4, observacao = $5, limite_horas = $6, limite_dias = $7, data_realizacao = $8, horas_celula_na_inspecao = $9, horas_motor_na_inspecao = $10, oficina_executante = $11 WHERE id = $12`,
+      [
+        aeronaveId,
+        nome,
+        sistema || 'celula',
+        conteudo || '',
+        observacao || null,
+        limiteHoras || 0,
+        limiteDias || 0,
+        dataRealizacao || '',
+        horasCelulaNaInspecao || 0,
+        sistema === 'motor' ? (horasMotorNaInspecao || 0) : 0,
+        oficinaExecutante || null,
+        id
+      ]
+    );
+    return insp;
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar inspeção periódica: ' + err.message);
+    throw err;
+  }
+}
+
+export async function deleteInspecaoPeriodica(id: string): Promise<void> {
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM inspecoes_periodicas WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar inspeção periódica: ' + err.message);
+    throw err;
+  }
+}
+

@@ -28,7 +28,11 @@ import {
   getUsuarioOficinaByEmail,
   addUsuarioOficina,
   updateUsuarioOficina,
-  deleteUsuarioOficina
+  deleteUsuarioOficina,
+  getInspecoesPeriodicas,
+  addInspecaoPeriodica,
+  updateInspecaoPeriodica,
+  deleteInspecaoPeriodica
 } from './src/server/db.js';
 
 async function startServer() {
@@ -370,6 +374,55 @@ async function startServer() {
   app.delete('/api/componentes/:id', async (req, res) => {
     try {
       await deleteComponente(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- INSPEÇÕES PERIÓDICAS ---
+  app.get('/api/inspecoes-periodicas', async (req, res) => {
+    try {
+      const aeronaveId = req.query.aeronaveId as string;
+      const list = await getInspecoesPeriodicas(aeronaveId);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/inspecoes-periodicas', async (req, res) => {
+    try {
+      const insp = req.body;
+      if (!insp.id) insp.id = 'ins_' + Math.random().toString(36).substr(2, 9);
+      insp.limiteHoras = Number(insp.limiteHoras || 0);
+      insp.limiteDias = Number(insp.limiteDias || 0);
+      insp.horasCelulaNaInspecao = Number(insp.horasCelulaNaInspecao || 0);
+      insp.horasMotorNaInspecao = insp.sistema === 'motor' ? Number(insp.horasMotorNaInspecao || 0) : 0;
+      const created = await addInspecaoPeriodica(insp);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/inspecoes-periodicas', async (req, res) => {
+    try {
+      const insp = req.body;
+      insp.limiteHoras = Number(insp.limiteHoras || 0);
+      insp.limiteDias = Number(insp.limiteDias || 0);
+      insp.horasCelulaNaInspecao = Number(insp.horasCelulaNaInspecao || 0);
+      insp.horasMotorNaInspecao = insp.sistema === 'motor' ? Number(insp.horasMotorNaInspecao || 0) : 0;
+      const updated = await updateInspecaoPeriodica(insp);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/inspecoes-periodicas/:id', async (req, res) => {
+    try {
+      await deleteInspecaoPeriodica(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

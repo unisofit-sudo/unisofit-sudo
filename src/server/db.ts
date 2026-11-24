@@ -200,12 +200,31 @@ export async function initDb() {
           id VARCHAR(100) PRIMARY KEY,
           aeronave_id VARCHAR(100) NOT NULL,
           data VARCHAR(20) NOT NULL,
+          de VARCHAR(4),
+          para VARCHAR(4),
+          partida VARCHAR(5),
+          decolagem VARCHAR(5),
+          pouso VARCHAR(5),
+          corte VARCHAR(5),
+          pax INTEGER DEFAULT 0,
+          pc INTEGER DEFAULT 0,
+          canac VARCHAR(6),
           horas_voo DOUBLE PRECISION NOT NULL,
           piloto VARCHAR(255),
           descricao TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_voo FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
+
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS de VARCHAR(4);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS para VARCHAR(4);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS partida VARCHAR(5);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS decolagem VARCHAR(5);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS pouso VARCHAR(5);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS corte VARCHAR(5);
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS pax INTEGER DEFAULT 0;
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS pc INTEGER DEFAULT 0;
+        ALTER TABLE historico_voos ADD COLUMN IF NOT EXISTS canac VARCHAR(6);
         
         CREATE TABLE IF NOT EXISTS componentes (
           id VARCHAR(100) PRIMARY KEY,
@@ -489,6 +508,15 @@ export async function getHistoricoVoos(aeronaveId?: string): Promise<HistoricoVo
       id: row.id,
       aeronaveId: row.aeronave_id,
       data: row.data,
+      de: row.de || undefined,
+      para: row.para || undefined,
+      partida: row.partida || undefined,
+      decolagem: row.decolagem || undefined,
+      pouso: row.pouso || undefined,
+      corte: row.corte || undefined,
+      pax: row.pax !== null && row.pax !== undefined ? Number(row.pax) : undefined,
+      pc: row.pc !== null && row.pc !== undefined ? Number(row.pc) : undefined,
+      canac: row.canac || undefined,
       horasVoo: Number(row.horas_voo),
       piloto: row.piloto,
       descricao: row.descricao,
@@ -503,15 +531,54 @@ export async function getHistoricoVoos(aeronaveId?: string): Promise<HistoricoVo
 export async function addVoo(voo: HistoricoVoo): Promise<HistoricoVoo> {
   try {
     const p = checkPool();
-    const { id, aeronaveId, data, horasVoo, piloto, descricao } = voo;
+    const {
+      id,
+      aeronaveId,
+      data,
+      de,
+      para,
+      partida,
+      decolagem,
+      pouso,
+      corte,
+      pax,
+      pc,
+      canac,
+      horasVoo,
+      piloto,
+      descricao
+    } = voo;
     
+    // Idempotência para sincronização offline: evita duplicar voo ou somar horas duas vezes
+    const existing = await p.query('SELECT id FROM historico_voos WHERE id = $1', [id]);
+    if (existing.rows.length > 0) {
+      return voo;
+    }
+
     // Inserir voo
     await p.query(
-      'INSERT INTO historico_voos (id, aeronave_id, data, horas_voo, piloto, descricao) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, aeronaveId, data, horasVoo, piloto, descricao]
+      `INSERT INTO historico_voos (id, aeronave_id, data, de, para, partida, decolagem, pouso, corte, pax, pc, canac, horas_voo, piloto, descricao)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        id,
+        aeronaveId,
+        data,
+        de || null,
+        para || null,
+        partida || null,
+        decolagem || null,
+        pouso || null,
+        corte || null,
+        pax !== undefined && pax !== null ? Number(pax) : 0,
+        pc !== undefined && pc !== null ? Number(pc) : 0,
+        canac || null,
+        horasVoo,
+        piloto,
+        descricao
+      ]
     );
     
-    // Atualizar horas totais da aeronave
+    // Atualizar horas totais da aeronave (Partida -> Corte aplicado para Célula, Motor e Hélice)
     await p.query(
       'UPDATE aeronaves SET horas_totais = horas_totais + $1, horas_motor = horas_motor + $1, horas_helice = horas_helice + $1 WHERE id = $2',
       [horasVoo, aeronaveId]

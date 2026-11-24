@@ -44,10 +44,22 @@ export interface HistoricoVoo {
   id: string;
   aeronaveId: string;
   data: string; // YYYY-MM-DD
-  horasVoo: number; // Quantas horas durou o voo, ex: 1.5, 2.0
+  de?: string; // 4 caracteres (ex: SBSP)
+  para?: string; // 4 caracteres (ex: SBGL)
+  partida?: string; // HH:MM
+  decolagem?: string; // HH:MM
+  pouso?: string; // HH:MM
+  corte?: string; // HH:MM
+  pax?: number; // Quantidade de passageiros (número)
+  pc?: number; // P/C (número)
+  canac?: string; // 6 dígitos numéricos
+  horasVoo: number; // Quantas horas durou o voo em decimal, calculado por Partida -> Corte
   piloto: string;
-  descricao: string; // Origem, destino ou observações
+  descricao: string; // Ocorrências
   created_at?: string;
+  pendingSync?: boolean;
+  queuedAt?: string;
+  syncError?: string;
 }
 
 export interface AnexoComponente {

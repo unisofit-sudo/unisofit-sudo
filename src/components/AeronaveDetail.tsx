@@ -3,9 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, AlertaManutencao, AnexoComponente } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, AnexoComponente } from '../types';
 import { calcularAlerta, calcularTodosAlertas, calcularAlertaInspecao, calcularTodosAlertasInspecoes, formatDataBR, obterDataHojeISO } from '../utils';
+import {
+  getAeronaveDetailCache,
+  saveAeronaveDetailCache,
+  queuePendingVoo,
+  getPendingVoos,
+  removePendingVoo,
+  OFFLINE_EVENTS,
+} from '../utils/offlineStore';
 import {
   Wrench,
   Gauge,
@@ -28,7 +36,8 @@ import {
   FileSpreadsheet,
   X,
   Eye,
-  ClipboardCheck
+  ClipboardCheck,
+  CloudUpload
 } from 'lucide-react';
 
 interface AeronaveDetailProps {
@@ -56,10 +65,45 @@ export default function AeronaveDetail({
 
   // Formulário: Diário de Bordo (Voo)
   const [isVooFormOpen, setIsVooFormOpen] = useState(false);
-  const [vooData, setVooData] = useState(new Date().toISOString().split('T')[0]);
-  const [vooHoras, setVooHoras] = useState(1.5);
+  const [vooData, setVooData] = useState(obterDataHojeISO());
+  const [vooDe, setVooDe] = useState('');
+  const [vooPara, setVooPara] = useState('');
+  const [vooPartida, setVooPartida] = useState('');
+  const [vooDecolagem, setVooDecolagem] = useState('');
+  const [vooPouso, setVooPouso] = useState('');
+  const [vooCorte, setVooCorte] = useState('');
+  const [vooPax, setVooPax] = useState('');
+  const [vooPc, setVooPc] = useState('');
   const [vooPiloto, setVooPiloto] = useState('');
+  const [vooCanac, setVooCanac] = useState('');
   const [vooDescricao, setVooDescricao] = useState('');
+  const [vooFormError, setVooFormError] = useState('');
+  const [vooListNotice, setVooListNotice] = useState<{ type: 'info' | 'warning'; text: string } | null>(null);
+
+  const formatTimeHHMM = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  };
+
+  const isValidHHMM = (val: string): boolean => {
+    return /^([01]\d|2[0-3]):([0-5]\d)$/.test(val);
+  };
+
+  const calcularDuracaoDecimal = (partida: string, corte: string): number => {
+    if (!isValidHHMM(partida) || !isValidHHMM(corte)) return 0;
+    const [pH, pM] = partida.split(':').map(Number);
+    const [cH, cM] = corte.split(':').map(Number);
+    const startMin = pH * 60 + pM;
+    let endMin = cH * 60 + cM;
+    if (endMin < startMin) {
+      endMin += 24 * 60; // Voo que vira a meia-noite
+    }
+    const diffMin = endMin - startMin;
+    return Number((diffMin / 60).toFixed(2));
+  };
+
+  const vooHorasCalculado = calcularDuracaoDecimal(vooPartida, vooCorte);
 
   // Formulário: Cadastrar Componente
   const [isCompFormOpen, setIsCompFormOpen] = useState(false);
@@ -111,9 +155,32 @@ export default function AeronaveDetail({
   const [attachmentName, setAttachmentName] = useState('');
   const [attachmentData, setAttachmentData] = useState('');
 
-  // --- CARGA DE DADOS ---
-  const fetchData = async () => {
+  // --- CARGA DE DADOS (COM CACHE OFFLINE + FILA DE VOOS PENDENTES) ---
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    const pendingForAircraft = await getPendingVoos(aeronave.id);
+    const pendingOrdered = [...pendingForAircraft].reverse();
+
+    const applyOfflineFallback = async () => {
+      const cached = await getAeronaveDetailCache(aeronave.id);
+      if (cached) {
+        setComponentes(cached.componentes);
+        setInspecoes(cached.inspecoes);
+        const serverIds = new Set(cached.voos.map((v) => v.id));
+        const onlyPending = pendingOrdered.filter((p) => !serverIds.has(p.id));
+        setVoos([...onlyPending, ...cached.voos]);
+        setRevisoes(cached.revisoes);
+      } else {
+        setVoos(pendingOrdered);
+      }
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      await applyOfflineFallback();
+      setLoading(false);
+      return;
+    }
+
     try {
       const [compRes, inspRes, voosRes, revRes] = await Promise.all([
         fetch(`/api/componentes?aeronaveId=${aeronave.id}`),
@@ -122,20 +189,52 @@ export default function AeronaveDetail({
         fetch(`/api/revisoes?aeronaveId=${aeronave.id}`)
       ]);
       
-      if (compRes.ok) setComponentes(await compRes.json());
-      if (inspRes.ok) setInspecoes(await inspRes.json());
-      if (voosRes.ok) setVoos(await voosRes.json());
-      if (revRes.ok) setRevisoes(await revRes.json());
+      if (compRes.ok && inspRes.ok && voosRes.ok && revRes.ok) {
+        const [compData, inspData, voosData, revData] = await Promise.all([
+          compRes.json(),
+          inspRes.json(),
+          voosRes.json(),
+          revRes.json(),
+        ]);
+
+        setComponentes(compData);
+        setInspecoes(inspData);
+        setRevisoes(revData);
+
+        const serverIds = new Set((voosData as HistoricoVoo[]).map((v) => v.id));
+        const onlyPending = pendingOrdered.filter((p) => !serverIds.has(p.id));
+        setVoos([...onlyPending, ...voosData]);
+
+        void saveAeronaveDetailCache(aeronave.id, {
+          componentes: compData,
+          inspecoes: inspData,
+          voos: voosData,
+          revisoes: revData,
+        });
+      } else {
+        await applyOfflineFallback();
+      }
     } catch (error) {
-      console.error('Erro ao buscar dados na detalhadora:', error);
+      console.error('Erro ao buscar dados na detalhadora (usando cache offline):', error);
+      await applyOfflineFallback();
     } finally {
       setLoading(false);
     }
-  };
+  }, [aeronave.id]);
 
   useEffect(() => {
-    fetchData();
-  }, [aeronave.id]);
+    void fetchData();
+
+    const onSyncOrPending = () => {
+      void fetchData();
+    };
+    window.addEventListener(OFFLINE_EVENTS.SYNC_COMPLETE, onSyncOrPending);
+    window.addEventListener(OFFLINE_EVENTS.PENDING_CHANGED, onSyncOrPending);
+    return () => {
+      window.removeEventListener(OFFLINE_EVENTS.SYNC_COMPLETE, onSyncOrPending);
+      window.removeEventListener(OFFLINE_EVENTS.PENDING_CHANGED, onSyncOrPending);
+    };
+  }, [fetchData]);
 
   // Calcula os alertas com base nas horas atuais da aeronave (Componentes + Inspeções Periódicas)
   const alertasComponentes = calcularTodosAlertas(componentes, aeronave);
@@ -151,40 +250,145 @@ export default function AeronaveDetail({
   const countAtencao = alertas.filter(a => a.status === 'atencao').length;
 
   // --- SUBMISSÃO DIÁRIO DE VOO ---
+  const openNovoVoo = () => {
+    setVooData(obterDataHojeISO());
+    setVooDe('');
+    setVooPara('');
+    setVooPartida('');
+    setVooDecolagem('');
+    setVooPouso('');
+    setVooCorte('');
+    setVooPax('');
+    setVooPc('');
+    setVooPiloto('');
+    setVooCanac('');
+    setVooDescricao('');
+    setVooFormError('');
+    setIsVooFormOpen(true);
+  };
+
   const handleAddVoo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (vooHoras <= 0) return;
+    setVooFormError('');
+
+    const deClean = vooDe.trim().toUpperCase();
+    const paraClean = vooPara.trim().toUpperCase();
+
+    if (deClean.length !== 4 || paraClean.length !== 4) {
+      setVooFormError('Os campos "De" e "Para" devem conter exatamente 4 caracteres.');
+      return;
+    }
+
+    if (!isValidHHMM(vooPartida) || !isValidHHMM(vooDecolagem) || !isValidHHMM(vooPouso) || !isValidHHMM(vooCorte)) {
+      setVooFormError('Preencha Partida, Decolagem, Pouso e Corte no formato válido HH:MM (ex: 08:30).');
+      return;
+    }
+
+    if (vooCanac.trim() && vooCanac.trim().length !== 6) {
+      setVooFormError('O campo CANAC deve conter exatamente 6 números.');
+      return;
+    }
+
+    const duracaoDecimal = calcularDuracaoDecimal(vooPartida, vooCorte);
+    if (duracaoDecimal <= 0) {
+      setVooFormError('A duração calculada entre Partida e Corte deve ser maior que 0.');
+      return;
+    }
+
+    const vooPayload: HistoricoVoo = {
+      id: `voo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      aeronaveId: aeronave.id,
+      data: vooData,
+      de: deClean,
+      para: paraClean,
+      partida: vooPartida,
+      decolagem: vooDecolagem,
+      pouso: vooPouso,
+      corte: vooCorte,
+      pax: vooPax !== '' ? Number(vooPax) : 0,
+      pc: vooPc !== '' ? Number(vooPc) : 0,
+      canac: vooCanac.trim() || undefined,
+      horasVoo: duracaoDecimal,
+      piloto: vooPiloto.trim(),
+      descricao: vooDescricao.trim()
+    };
+
+    const resetVooFormAndRefresh = () => {
+      setIsVooFormOpen(false);
+      setVooDe('');
+      setVooPara('');
+      setVooPartida('');
+      setVooDecolagem('');
+      setVooPouso('');
+      setVooCorte('');
+      setVooPax('');
+      setVooPc('');
+      setVooPiloto('');
+      setVooCanac('');
+      setVooDescricao('');
+      onRefreshAeronave();
+      void fetchData();
+    };
+
+    const saveOffline = async () => {
+      await queuePendingVoo(vooPayload);
+      setVooListNotice({
+        type: 'info',
+        text: `Voo salvo offline (${duracaoDecimal.toFixed(2)} hs Partida → Corte). As horas de Célula, Motor e Hélice já foram atualizadas nos alertas e serão sincronizadas automaticamente ao reconectar.`,
+      });
+      resetVooFormAndRefresh();
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      await saveOffline();
+      return;
+    }
+
     try {
       const response = await fetch('/api/historico', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          aeronaveId: aeronave.id,
-          data: vooData,
-          horasVoo: Number(vooHoras),
-          piloto: vooPiloto.trim(),
-          descricao: vooDescricao.trim()
-        })
+        body: JSON.stringify(vooPayload)
       });
       if (response.ok) {
-        setIsVooFormOpen(false);
-        setVooPiloto('');
-        setVooDescricao('');
-        onRefreshAeronave(); // Recarrega horas calculadas gerais na aeronave pai
-        fetchData(); // Recarrega tabelas locais
+        setVooListNotice(null);
+        resetVooFormAndRefresh();
+      } else if (response.status >= 500) {
+        await saveOffline();
+      } else {
+        const errData = await response.json().catch(() => null);
+        setVooFormError(errData?.error || 'Não foi possível registrar o voo.');
       }
     } catch (e) {
-      console.error(e);
+      console.warn('Sem conexão com o servidor, salvando voo na fila offline:', e);
+      await saveOffline();
     }
   };
 
-  const handleDeleteVoo = async (id: string) => {
+  const handleDeleteVoo = async (id: string, isPending?: boolean) => {
+    if (isPending) {
+      if (confirm('Remover este voo da fila offline? Ele ainda não foi enviado ao servidor e suas horas serão revertidas.')) {
+        await removePendingVoo(id);
+        onRefreshAeronave();
+        void fetchData();
+      }
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setVooListNotice({
+        type: 'warning',
+        text: 'Para excluir um voo já sincronizado com o banco de dados, é necessário estar conectado à internet.',
+      });
+      return;
+    }
+
     if (confirm('Tem certeza de que deseja remover este registro de voo? As horas acumuladas da aeronave serão ajustadas automaticamente.')) {
       try {
         const res = await fetch(`/api/historico/${id}`, { method: 'DELETE' });
         if (res.ok) {
           onRefreshAeronave();
-          fetchData();
+          void fetchData();
         }
       } catch (e) {
         console.error(e);
@@ -1898,14 +2102,14 @@ export default function AeronaveDetail({
         {/* --- TAB 3: DIÁRIO DE VOO (HISTÓRICO) --- */}
         {!loading && activeTab === 'voos' && (
           isVooFormOpen ? (
-            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-2xl mx-auto animate-fade-in">
+            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
               <div className="flex justify-between items-center pb-4 border-b border-slate-850">
                 <div>
                   <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
                     <Activity className="w-5 h-5 text-sky-400" />
                     Registrar Novo Voo no Diário de Bordo
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Adicione os tempos e roteiro do voo para atualização automática dos tempos limites.</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Adicione os dados da etapa do voo. A duração decimal é calculada automaticamente entre Partida e Corte.</p>
                 </div>
                 <button
                   onClick={() => setIsVooFormOpen(false)}
@@ -1915,8 +2119,14 @@ export default function AeronaveDetail({
                 </button>
               </div>
 
+              {vooFormError && (
+                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 font-medium">
+                  {vooFormError}
+                </div>
+              )}
+
               <form onSubmit={handleAddVoo} className="space-y-6">
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1.5">Data do Voo *</label>
                     <input
@@ -1928,16 +2138,144 @@ export default function AeronaveDetail({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Duração de Voo (Hs) *</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">De (4 caracteres) *</label>
                     <input
-                      type="number"
-                      step="0.1"
+                      type="text"
                       required
-                      min={0.1}
-                      value={vooHoras}
-                      onChange={(e) => setVooHoras(Number(e.target.value))}
-                      placeholder="Ex: 2.3"
-                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-bold font-mono transition-colors"
+                      minLength={4}
+                      maxLength={4}
+                      value={vooDe}
+                      onChange={(e) => setVooDe(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4))}
+                      placeholder="Ex: SBSP"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono uppercase tracking-wider transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Para (4 caracteres) *</label>
+                    <input
+                      type="text"
+                      required
+                      minLength={4}
+                      maxLength={4}
+                      value={vooPara}
+                      onChange={(e) => setVooPara(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4))}
+                      placeholder="Ex: SBGL"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono uppercase tracking-wider transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/50 p-5 rounded-xl space-y-4 border border-slate-800">
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-sky-400 font-mono">Horários da Etapa (HH:MM)</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 items-end">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Partida *</label>
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={5}
+                        pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+                        value={vooPartida}
+                        onChange={(e) => setVooPartida(formatTimeHHMM(e.target.value))}
+                        placeholder="HH:MM"
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono text-center transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Decolagem *</label>
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={5}
+                        pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+                        value={vooDecolagem}
+                        onChange={(e) => setVooDecolagem(formatTimeHHMM(e.target.value))}
+                        placeholder="HH:MM"
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono text-center transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Pouso *</label>
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={5}
+                        pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+                        value={vooPouso}
+                        onChange={(e) => setVooPouso(formatTimeHHMM(e.target.value))}
+                        placeholder="HH:MM"
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono text-center transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Corte *</label>
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={5}
+                        pattern="^([01]\d|2[0-3]):([0-5]\d)$"
+                        value={vooCorte}
+                        onChange={(e) => setVooCorte(formatTimeHHMM(e.target.value))}
+                        placeholder="HH:MM"
+                        className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono text-center transition-colors"
+                      />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-xs font-semibold text-sky-400 mb-1.5">Duração (Hs Dec.)</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={vooHorasCalculado > 0 ? vooHorasCalculado.toFixed(2) : '0.00'}
+                        className="w-full bg-slate-900 border border-sky-500/40 rounded-xl px-3.5 py-3 text-sm text-sky-400 font-extrabold font-mono text-center cursor-default"
+                        title="Calculado automaticamente entre Partida e Corte em horas decimais"
+                      />
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-500 block">
+                    Duração de voo calculada automaticamente em horas decimais a partir dos campos Partida e Corte.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">PAX (Número)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={vooPax}
+                      onChange={(e) => setVooPax(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 2"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">P/C (Número)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={vooPc}
+                      onChange={(e) => setVooPc(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Ex: 1"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono transition-colors"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">CANAC (6 números) *</label>
+                    <input
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      minLength={6}
+                      maxLength={6}
+                      pattern="\d{6}"
+                      value={vooCanac}
+                      onChange={(e) => setVooCanac(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Ex: 123456"
+                      className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 font-mono tracking-wider transition-colors"
                     />
                   </div>
                 </div>
@@ -1949,17 +2287,17 @@ export default function AeronaveDetail({
                     required
                     value={vooPiloto}
                     onChange={(e) => setVooPiloto(e.target.value)}
-                    placeholder="Ex: Almirante Nelson"
+                    placeholder="Ex: Cmte. Carlos Silva"
                     className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-605 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Roteiro / Descrição do Diário</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Ocorrências</label>
                   <textarea
                     value={vooDescricao}
                     onChange={(e) => setVooDescricao(e.target.value)}
-                    placeholder="Ex: Translado SBSP - SBGL. Condições meteorológicas normais, voo VFR."
+                    placeholder="Registre ocorrências do voo, discrepâncias ou observações..."
                     rows={4}
                     className="w-full bg-slate-1000 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-605 transition-colors"
                   ></textarea>
@@ -1991,10 +2329,7 @@ export default function AeronaveDetail({
                 </div>
                 {userRole !== 'oficina' && (
                   <button
-                    onClick={() => {
-                      setVooData(new Date().toISOString().split('T')[0]);
-                      setIsVooFormOpen(true);
-                    }}
+                    onClick={openNovoVoo}
                     className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
                   >
                     <Plus className="w-4 h-4" />
@@ -2002,6 +2337,26 @@ export default function AeronaveDetail({
                   </button>
                 )}
               </div>
+
+              {vooListNotice && (
+                <div
+                  className={`flex items-start justify-between gap-3 rounded-xl px-4 py-3 text-xs border ${
+                    vooListNotice.type === 'warning'
+                      ? 'bg-amber-950/40 border-amber-500/35 text-amber-200'
+                      : 'bg-sky-950/45 border-sky-500/35 text-sky-200'
+                  }`}
+                >
+                  <span>{vooListNotice.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => setVooListNotice(null)}
+                    className="text-slate-400 hover:text-white cursor-pointer"
+                    aria-label="Fechar aviso"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {voos.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
@@ -2012,36 +2367,87 @@ export default function AeronaveDetail({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
-                        <th className="p-4">Data do Voo</th>
-                        <th className="p-4">Piloto em Comando</th>
-                        <th className="p-4">Duração (Horas)</th>
-                        <th className="p-4">Roteiro / Observações</th>
+                        <th className="p-4">Data</th>
+                        <th className="p-4">De / Para</th>
+                        <th className="p-4">Part. / Dec. / Pouso / Corte</th>
+                        <th className="p-4">PAX / P/C</th>
+                        <th className="p-4">Piloto em Comando / CANAC</th>
+                        <th className="p-4">Duração (Hs)</th>
+                        <th className="p-4">Ocorrências</th>
                         <th className="p-4 text-right">Ação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/40 text-slate-300">
                       {voos.map((v) => (
-                        <tr key={v.id} className="hover:bg-slate-850/40 transition-colors" id={`voo-row-${v.id}`}>
-                          <td className="p-4 font-bold text-white">
-                            <span className="flex items-center gap-2">
-                              <Activity className="w-4 h-4 text-sky-400" />
-                              {formatDataBR(v.data)}
-                            </span>
+                        <tr
+                          key={v.id}
+                          className={`hover:bg-slate-850/40 transition-colors ${v.pendingSync ? 'bg-amber-950/15' : ''}`}
+                          id={`voo-row-${v.id}`}
+                        >
+                          <td className="p-4 font-bold text-white whitespace-nowrap">
+                            <div className="space-y-1">
+                              <span className="flex items-center gap-2">
+                                <Activity className={`w-4 h-4 ${v.pendingSync ? 'text-amber-400' : 'text-sky-400'}`} />
+                                {formatDataBR(v.data)}
+                              </span>
+                              {v.pendingSync && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                                  <CloudUpload className="w-3 h-3" />
+                                  Pendente Offline
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono font-bold text-slate-200 whitespace-nowrap">
+                            {v.de || v.para ? (
+                              <span className="inline-flex items-center gap-1.5 bg-slate-800/70 px-2.5 py-1 rounded-lg border border-slate-700/50">
+                                <span>{v.de || '----'}</span>
+                                <span className="text-sky-400">→</span>
+                                <span>{v.para || '----'}</span>
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td className="p-4 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                            {v.partida || v.decolagem || v.pouso || v.corte ? (
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                                <span>Part: <strong className="text-slate-100">{v.partida || '--:--'}</strong></span>
+                                <span>Dec: <strong className="text-slate-100">{v.decolagem || '--:--'}</strong></span>
+                                <span>Pouso: <strong className="text-slate-100">{v.pouso || '--:--'}</strong></span>
+                                <span>Corte: <strong className="text-slate-100">{v.corte || '--:--'}</strong></span>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td className="p-4 font-mono text-[11px] whitespace-nowrap">
+                            {v.pax !== undefined || v.pc !== undefined ? (
+                              <div className="space-y-0.5">
+                                <div>PAX: <strong className="text-slate-100">{v.pax ?? 0}</strong></div>
+                                <div>P/C: <strong className="text-slate-100">{v.pc ?? 0}</strong></div>
+                              </div>
+                            ) : '-'}
                           </td>
                           <td className="p-4">
-                            <span className="flex items-center gap-1.5 font-medium text-slate-200">
-                              <User className="w-3.5 h-3.5 text-slate-500" />
-                              <span>{v.piloto || 'N/D'}</span>
-                            </span>
+                            <div className="space-y-0.5">
+                              <span className="flex items-center gap-1.5 font-medium text-slate-200">
+                                <User className="w-3.5 h-3.5 text-slate-500" />
+                                <span>{v.piloto || 'N/D'}</span>
+                              </span>
+                              {v.canac && (
+                                <div className="text-[10px] font-mono text-slate-400 pl-5">
+                                  CANAC: <strong className="text-slate-200">{v.canac}</strong>
+                                </div>
+                              )}
+                            </div>
                           </td>
-                          <td className="p-4 font-black text-sky-400 text-[13px] font-mono">{v.horasVoo.toFixed(1)} hs</td>
-                          <td className="p-4 text-slate-400 font-medium italic">{v.descricao || '-'}</td>
+                          <td className="p-4 font-black text-sky-400 text-[13px] font-mono whitespace-nowrap">
+                            {v.horasVoo.toFixed(2)} hs
+                          </td>
+                          <td className="p-4 text-slate-400 font-medium italic max-w-xs">{v.descricao || '-'}</td>
                           <td className="p-4 text-right">
                             {userRole !== 'oficina' && (
                               <button
-                                onClick={() => handleDeleteVoo(v.id)}
+                                onClick={() => void handleDeleteVoo(v.id, v.pendingSync)}
                                 className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
-                                title="Excluir Diário"
+                                title={v.pendingSync ? 'Remover voo pendente da fila offline' : 'Excluir Diário'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

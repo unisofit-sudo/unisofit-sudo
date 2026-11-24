@@ -3,27 +3,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { Cliente, Aeronave, DashboardStats } from './types';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Cliente, Aeronave } from './types';
 import ClientesList from './components/ClientesList';
 import AeronavesList from './components/AeronavesList';
 import AeronaveDetail from './components/AeronaveDetail';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import {
+  getClientesCache,
+  saveClientesCache,
+  getAeronavesCache,
+  saveAeronavesCache,
+  saveAeronaveDetailCache,
+  getPendingVoos,
+  syncPendingVoos,
+  applyPendingVoosToAeronavesList,
+  OFFLINE_EVENTS,
+  PendingVoo,
+} from './utils/offlineStore';
 import loggyLogo from './assets/images/loggy_logo_1783944292576.jpg';
 import { 
-  Plane, 
-  Users, 
   ShieldAlert, 
   Database, 
   Info, 
-  Wrench, 
-  Gauge, 
   ArrowLeft,
   Server,
   Lock,
   LogOut,
   User,
-  Key,
-  Compass
 } from 'lucide-react';
 
 export default function App() {
@@ -50,6 +58,7 @@ export default function App() {
     error: null
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingVoos, setPendingVoos] = useState<PendingVoo[]>([]);
 
   // Estados adicionais para configurar a base de dados dinamicamente pela tela de erro
   const [dbHost, setDbHost] = useState('');
@@ -160,9 +169,95 @@ export default function App() {
     }
   };
 
-  // --- BUSCAR DADOS DO BACKEND ---
-  const fetchBasics = async () => {
+  const refreshPendingVoos = useCallback(async () => {
+    const list = await getPendingVoos();
+    setPendingVoos(list);
+  }, []);
+
+  const effectiveAeronaves = useMemo(
+    () => applyPendingVoosToAeronavesList(aeronaves, pendingVoos),
+    [aeronaves, pendingVoos]
+  );
+
+  const effectiveSelectedAeronave = useMemo(() => {
+    if (!selectedAeronave) return null;
+    return effectiveAeronaves.find((a) => a.id === selectedAeronave.id) || selectedAeronave;
+  }, [selectedAeronave, effectiveAeronaves]);
+
+  const prefetchAeronavesOffline = useCallback(async (aeroList: Aeronave[]) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    const cachedRole = localStorage.getItem('aeromanut_userRole');
+    const cachedUserRaw = localStorage.getItem('aeromanut_currentUser');
+    let targetList = aeroList;
+    if ((cachedRole === 'cliente' || cachedRole === 'oficina') && cachedUserRaw) {
+      try {
+        const uObj = JSON.parse(cachedUserRaw);
+        targetList = aeroList.filter((a) => a.clienteId === uObj.id);
+      } catch {
+        // ignore
+      }
+    } else {
+      targetList = aeroList.slice(0, 10);
+    }
+
+    for (const aero of targetList) {
+      try {
+        const [compRes, inspRes, voosRes, revRes] = await Promise.all([
+          fetch(`/api/componentes?aeronaveId=${aero.id}`),
+          fetch(`/api/inspecoes-periodicas?aeronaveId=${aero.id}`),
+          fetch(`/api/historico?aeronaveId=${aero.id}`),
+          fetch(`/api/revisoes?aeronaveId=${aero.id}`),
+        ]);
+        if (compRes.ok && inspRes.ok && voosRes.ok && revRes.ok) {
+          const [componentes, inspecoes, voos, revisoes] = await Promise.all([
+            compRes.json(),
+            inspRes.json(),
+            voosRes.json(),
+            revRes.json(),
+          ]);
+          await saveAeronaveDetailCache(aero.id, {
+            componentes,
+            inspecoes,
+            voos,
+            revisoes,
+          });
+        }
+      } catch {
+        // Ignora silenciosamente se ficar offline durante prefetch
+      }
+    }
+  }, []);
+
+  // --- BUSCAR DADOS DO BACKEND (COM FALLBACK OFFLINE EM CACHE) ---
+  const fetchBasics = useCallback(async () => {
     setIsRefreshing(true);
+
+    const loadFromCacheFallback = async (reason?: string) => {
+      const [cachedClientes, cachedAeronaves, pending] = await Promise.all([
+        getClientesCache(),
+        getAeronavesCache(),
+        getPendingVoos(),
+      ]);
+      setPendingVoos(pending);
+      const hasSession = Boolean(localStorage.getItem('aeromanut_userRole'));
+      if (cachedClientes.length > 0 || cachedAeronaves.length > 0 || hasSession) {
+        if (cachedClientes.length > 0) setClientes(cachedClientes);
+        if (cachedAeronaves.length > 0) setAeronaves(cachedAeronaves);
+        setDbStatus({ connected: true, error: null });
+        return true;
+      }
+      if (reason) {
+        setDbStatus({ connected: false, error: reason });
+      }
+      return false;
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      await loadFromCacheFallback('Dispositivo sem conexão com a internet e sem dados em cache.');
+      setIsRefreshing(false);
+      return;
+    }
+
     try {
       // 1. Primeiro verifica o health-check e conexão com o banco
       const healthRes = await fetch('/api/health');
@@ -190,7 +285,11 @@ export default function App() {
         return;
       }
 
-      // 2. Se a conexão estiver ativa, faz a sincronização dos dados
+      // 2. Antes de buscar aeronaves atualizadas, sincroniza eventuais voos gravados offline
+      await syncPendingVoos();
+      await refreshPendingVoos();
+
+      // 3. Se a conexão estiver ativa, faz a sincronização dos dados
       const [cliRes, aeroRes] = await Promise.all([
         fetch('/api/clientes'),
         fetch('/api/aeronaves')
@@ -212,6 +311,11 @@ export default function App() {
       setClientes(clientList);
       setAeronaves(aeroList);
 
+      // Persiste snapshots no IndexedDB para uso offline
+      void saveClientesCache(clientList);
+      void saveAeronavesCache(aeroList);
+      void prefetchAeronavesOffline(aeroList);
+
       // Se for cliente ou oficina, sincroniza as informações atualizadas do próprio perfil do banco de dados
       const cachedRole = localStorage.getItem('aeromanut_userRole');
       const cachedUser = localStorage.getItem('aeromanut_currentUser');
@@ -228,29 +332,47 @@ export default function App() {
       setDbStatus({ connected: true, error: null });
     } catch (e: any) {
       console.error('Falha ao sincronizar dados com o servidor:', e);
-      setDbStatus({
-        connected: false,
-        error: e?.message || 'Erro de rede ao conectar à API.'
-      });
+      await loadFromCacheFallback(e?.message || 'Erro de rede ao conectar à API.');
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [prefetchAeronavesOffline, refreshPendingVoos]);
 
   useEffect(() => {
-    fetchBasics();
-  }, []);
+    void refreshPendingVoos();
+    void fetchBasics();
+
+    const onPendingChanged = () => {
+      void refreshPendingVoos();
+    };
+    const onSyncComplete = () => {
+      void fetchBasics();
+    };
+
+    window.addEventListener(OFFLINE_EVENTS.PENDING_CHANGED, onPendingChanged);
+    window.addEventListener(OFFLINE_EVENTS.SYNC_COMPLETE, onSyncComplete);
+    return () => {
+      window.removeEventListener(OFFLINE_EVENTS.PENDING_CHANGED, onPendingChanged);
+      window.removeEventListener(OFFLINE_EVENTS.SYNC_COMPLETE, onSyncComplete);
+    };
+  }, [fetchBasics, refreshPendingVoos]);
 
   // Recarrega informações de uma aeronave específica da lista
   const handleRefreshAeronave = async () => {
     if (!selectedAeronave) return;
+    await refreshPendingVoos();
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     try {
       const res = await fetch(`/api/aeronaves/${selectedAeronave.id}`);
       if (res.ok) {
         const updatedAero: Aeronave = await res.json();
         
-        // Atualiza na lista local de aeronaves
-        setAeronaves(prev => prev.map(a => a.id === updatedAero.id ? updatedAero : a));
+        // Atualiza na lista local de aeronaves e no cache offline
+        setAeronaves(prev => {
+          const next = prev.map(a => a.id === updatedAero.id ? updatedAero : a);
+          void saveAeronavesCache(next);
+          return next;
+        });
         // Atualiza o contexto do selecionador
         setSelectedAeronave(updatedAero);
       }
@@ -260,7 +382,7 @@ export default function App() {
   };
 
   // Contabiliza aeronaves por cliente
-  const aeronavesCountMap = aeronaves.reduce<Record<string, number>>((acc, aero) => {
+  const aeronavesCountMap = effectiveAeronaves.reduce<Record<string, number>>((acc, aero) => {
     acc[aero.clienteId] = (acc[aero.clienteId] || 0) + 1;
     return acc;
   }, {});
@@ -437,6 +559,10 @@ export default function App() {
                 )}
               </button>
             </form>
+
+            <div className="pt-2 flex justify-center">
+              <PWAInstallButton />
+            </div>
           </div>
         </div>
 
@@ -712,21 +838,26 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/20 hover:bg-red-950/60 border border-red-900/40 text-[11px] font-semibold text-red-400 transition-all cursor-pointer"
-              title="Sair do Sistema"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <PWAInstallButton />
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-950/20 hover:bg-red-950/60 border border-red-900/40 text-[11px] font-semibold text-red-400 transition-all cursor-pointer"
+                title="Sair do Sistema"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
+      <OfflineIndicator />
+
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6" id="app-workspace">
-        {selectedAeronave ? (
+        {effectiveSelectedAeronave ? (
           /* WORKSPACE INDIVIDUAL DE UMA AERONAVE COM MAPA DE COMPONENTES, HISTÓRICO, LAUDOS E UPLOADS */
           <div className="space-y-4 animate-fade-in">
             <button
@@ -738,7 +869,7 @@ export default function App() {
               Voltar para a Frota de Aeronaves
             </button>
             <AeronaveDetail
-              aeronave={selectedAeronave}
+              aeronave={effectiveSelectedAeronave}
               cliente={selectedCliente!}
               onRefreshAeronave={handleRefreshAeronave}
               userRole={userRole}
@@ -787,7 +918,7 @@ export default function App() {
               {/* Aeronaves (Eixo Direito - 7 das 12 colunas ou 12 cheias se cliente) */}
               <div className={userRole === 'admin' ? "md:col-span-12 lg:col-span-7 h-full" : "md:col-span-12 h-full"}>
                 <AeronavesList
-                  aeronaves={aeronaves}
+                  aeronaves={effectiveAeronaves}
                   selectedCliente={selectedCliente}
                   onSelectAeronave={(a) => setSelectedAeronave(a)}
                   selectedAeronaveId={selectedAeronave?.id || null}

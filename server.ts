@@ -310,6 +310,15 @@ async function startServer() {
     try {
       const voo = req.body;
       if (!voo.id) voo.id = 'voo_' + Math.random().toString(36).substr(2, 9);
+      voo.de = voo.de ? String(voo.de).trim().toUpperCase().slice(0, 4) : undefined;
+      voo.para = voo.para ? String(voo.para).trim().toUpperCase().slice(0, 4) : undefined;
+      voo.partida = voo.partida ? String(voo.partida).trim().slice(0, 5) : undefined;
+      voo.decolagem = voo.decolagem ? String(voo.decolagem).trim().slice(0, 5) : undefined;
+      voo.pouso = voo.pouso ? String(voo.pouso).trim().slice(0, 5) : undefined;
+      voo.corte = voo.corte ? String(voo.corte).trim().slice(0, 5) : undefined;
+      voo.pax = voo.pax !== undefined && voo.pax !== '' ? parseInt(String(voo.pax).replace(/\D/g, ''), 10) || 0 : 0;
+      voo.pc = voo.pc !== undefined && voo.pc !== '' ? parseInt(String(voo.pc).replace(/\D/g, ''), 10) || 0 : 0;
+      voo.canac = voo.canac ? String(voo.canac).replace(/\D/g, '').slice(0, 6) : undefined;
       voo.horasVoo = Number(voo.horasVoo || 0);
       const created = await addVoo(voo);
       res.status(201).json(created);

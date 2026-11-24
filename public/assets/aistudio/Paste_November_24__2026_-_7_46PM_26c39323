@@ -1,0 +1,1377 @@
+2026-Nov-24 22:43:31
+Docker 29.4.1 with BuildKit and Buildx detected on deployment server (localhost).
+2026-Nov-24 22:43:31
+Starting deployment of unisofit-sudo/unisofit-sudo:main to localhost.
+2026-Nov-24 22:43:31
+Preparing container with helper image: docker.io/coollabsio/coolify-helper:1.0.19
+2026-Nov-24 22:43:34
+----------------------------------------
+2026-Nov-24 22:43:34
+Importing unisofit-sudo/unisofit-sudo:main (commit sha c13c618c3738163b3e7dd3ca9c89f1ae38668daf) to /artifacts/sgjuoxd0e1cgt2ltmu0jr4ar.
+2026-Nov-24 22:43:36
+Image not found (jj2l2d9e319wdl6tusptcf53:c13c618c3738163b3e7dd3ca9c89f1ae38668daf). Building new image.
+2026-Nov-24 22:43:37
+----------------------------------------
+2026-Nov-24 22:43:37
+Building docker image started.
+2026-Nov-24 22:43:37
+To check the current progress, click on Show Debug Logs.
+2026-Nov-24 22:44:01
+========================================
+2026-Nov-24 22:44:01
+Deployment failed: Command execution failed (exit code 1): docker exec sgjuoxd0e1cgt2ltmu0jr4ar bash -c 'bash /artifacts/build.sh'
+2026-Nov-24 22:44:01
+Error: #0 building with "default" instance using docker driver
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#1 [internal] load build definition from Dockerfile
+2026-Nov-24 22:44:01
+#1 transferring dockerfile: 1.18kB done
+2026-Nov-24 22:44:01
+#1 DONE 0.0s
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#2 [internal] load metadata for docker.io/library/node:20-alpine
+2026-Nov-24 22:44:01
+#2 DONE 0.5s
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#3 [internal] load .dockerignore
+2026-Nov-24 22:44:01
+#3 transferring context: 89B done
+2026-Nov-24 22:44:01
+#3 DONE 0.0s
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#4 [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+2026-Nov-24 22:44:01
+#4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 0.0s done
+2026-Nov-24 22:44:01
+#4 DONE 0.0s
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#5 [internal] load build context
+2026-Nov-24 22:44:01
+#5 transferring context: 1.11MB 0.0s done
+2026-Nov-24 22:44:01
+#5 DONE 0.0s
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#6 [builder 2/7] WORKDIR /app
+2026-Nov-24 22:44:01
+#6 CACHED
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#7 [builder 3/7] RUN apk add --no-cache python3 make g++
+2026-Nov-24 22:44:01
+#7 CACHED
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#8 [builder 4/7] COPY package*.json ./
+2026-Nov-24 22:44:01
+#8 CACHED
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#9 [stage-1 3/5] COPY package*.json ./
+2026-Nov-24 22:44:01
+#9 CACHED
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#10 [builder 5/7] RUN npm ci
+2026-Nov-24 22:44:01
+#10 ...
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#11 [stage-1 4/5] RUN npm ci --only=production
+2026-Nov-24 22:44:01
+#11 0.236 npm warn config only Use `--omit=dev` to omit dev dependencies from the install.
+2026-Nov-24 22:44:01
+#11 21.20 npm error code EUSAGE
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: vite-plugin-pwa@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: pretty-bytes@6.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-build@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-window@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @apideck/better-ajv-errors@0.3.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: ajv@8.20.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/preset-env@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/runtime@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @rollup/plugin-babel@6.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @rollup/plugin-node-resolve@16.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @rollup/plugin-replace@6.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @rollup/plugin-terser@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @trickfilm400/rollup-plugin-off-main-thread@3.0.0-pre1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: common-tags@1.8.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: eta@4.6.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: fast-json-stable-stringify@2.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: fs-extra@9.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: glob@11.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: pretty-bytes@5.6.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: source-map@0.8.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: stringify-object@3.3.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: strip-comments@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: tempy@0.6.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: upath@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-background-sync@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-broadcast-update@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-cacheable-response@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-core@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-expiration@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-google-analytics@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-navigation-preload@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-precaching@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-range-requests@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-recipes@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-routing@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-strategies@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-streams@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: workbox-sw@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: jsonpointer@5.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: leven@3.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/helper-compilation-targets@7.29.7 does not satisfy @babel/helper-compilation-targets@7.29.13
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-firefox-class-in-computed-class-key@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-safari-class-field-initializer-scope@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-safari-rest-destructuring-rhs-array@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-bugfix-v8-static-class-fields-redefine-readonly@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-proposal-private-property-in-object@7.21.0-placeholder-for-preset-env.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-syntax-import-assertions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-syntax-import-attributes@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-syntax-unicode-sets-regex@7.18.6 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-arrow-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-async-generator-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-async-to-generator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-block-scoped-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-block-scoping@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-class-properties@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-class-static-block@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-classes@7.29.11 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-computed-properties@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-destructuring@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-dotall-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-duplicate-keys@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-duplicate-named-capturing-groups-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-dynamic-import@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-explicit-resource-management@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-exponentiation-operator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-export-namespace-from@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-for-of@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-function-name@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-json-strings@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-logical-assignment-operators@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-member-expression-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-modules-amd@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-modules-commonjs@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-modules-systemjs@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-modules-umd@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-named-capturing-groups-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-new-target@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-nullish-coalescing-operator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-numeric-separator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-object-rest-spread@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-object-super@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-optional-catch-binding@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-optional-chaining@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-parameters@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-private-methods@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-private-property-in-object@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-property-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-regenerator@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-regexp-modifiers@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-reserved-words@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-shorthand-properties@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-spread@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-sticky-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-template-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-typeof-symbol@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-unicode-escapes@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-unicode-property-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-unicode-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/plugin-transform-unicode-sets-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/preset-modules@0.1.6-no-external-plugins from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: babel-plugin-polyfill-corejs2@0.4.17 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: babel-plugin-polyfill-corejs3@0.14.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: babel-plugin-polyfill-regenerator@0.6.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: core-js-compat@3.51.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-skip-transparent-expression-wrappers@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/traverse@7.29.7 does not satisfy @babel/traverse@7.29.15
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/types@7.29.7 does not satisfy @babel/types@7.29.15
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-create-regexp-features-plugin@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-annotate-as-pure@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regexpu-core@6.5.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-remap-async-to-generator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-wrap-function@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-create-class-features-plugin@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-member-expression-to-functions@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-optimise-call-expression@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-replace-supers@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/helper-module-transforms@7.29.7 does not satisfy @babel/helper-module-transforms@7.29.14
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: esutils@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/generator@7.29.7 does not satisfy @babel/generator@7.29.15
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/parser@7.29.7 does not satisfy @babel/parser@7.29.15
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's @babel/helper-string-parser@7.29.7 does not satisfy @babel/helper-string-parser@7.29.15
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @rollup/pluginutils@5.5.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @types/resolve@1.20.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: deepmerge@4.3.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-module@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: resolve@1.22.14 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: serialize-javascript@7.1.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: smob@1.6.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: terser@5.51.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: estree-walker@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: ejs@3.1.10 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: string.prototype.matchall@4.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: fast-deep-equal@3.1.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: fast-uri@3.1.9 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: json-schema-traverse@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: require-from-string@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @babel/helper-define-polyfill-provider@0.6.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: lodash.debounce@4.0.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's browserslist@4.28.2 does not satisfy browserslist@4.29.6
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's baseline-browser-mapping@2.10.37 does not satisfy baseline-browser-mapping@2.11.39
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's caniuse-lite@1.0.30001799 does not satisfy caniuse-lite@1.0.30001828
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's electron-to-chromium@1.5.375 does not satisfy electron-to-chromium@1.5.493
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's node-releases@2.0.47 does not satisfy node-releases@2.0.65
+2026-Nov-24 22:44:01
+#11 21.21 npm error Invalid: lock file's update-browserslist-db@1.2.3 does not satisfy update-browserslist-db@1.4.0
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: jake@10.9.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: at-least-node@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: jsonfile@6.2.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: universalify@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: foreground-child@3.3.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: jackspeak@4.2.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: minimatch@10.2.6 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: minipass@7.1.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: package-json-from-dist@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: path-scurry@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: cross-spawn@7.0.6 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: signal-exit@4.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: path-key@3.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: shebang-command@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: which@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @isaacs/cliui@9.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: async@3.2.6 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: filelist@1.0.6 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: minimatch@5.1.9 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: brace-expansion@5.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: balanced-match@4.0.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: lru-cache@11.5.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regenerate@1.5.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regenerate-unicode-properties@10.3.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regjsgen@0.8.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regjsparser@0.14.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unicode-match-property-ecmascript@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unicode-match-property-value-ecmascript@2.2.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-core-module@2.18.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: path-parse@1.0.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: supports-preserve-symlinks-flag@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: shebang-regex@3.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: call-bind@1.0.9 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: define-properties@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: es-abstract@1.24.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: internal-slot@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: regexp.prototype.flags@1.5.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: set-function-name@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: set-function-length@1.2.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: define-data-property@1.1.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: has-property-descriptors@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: object-keys@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: array-buffer-byte-length@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: arraybuffer.prototype.slice@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: available-typed-arrays@1.0.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: data-view-buffer@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: data-view-byte-length@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: data-view-byte-offset@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: es-set-tostringtag@2.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: es-to-primitive@1.3.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: function.prototype.name@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: get-symbol-description@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: globalthis@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: has-proto@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-array-buffer@3.0.5 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-callable@1.2.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-data-view@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-negative-zero@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-regex@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-set@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-shared-array-buffer@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-string@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-typed-array@1.1.15 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-weakref@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: object.assign@4.1.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: own-keys@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: safe-array-concat@1.1.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: safe-push-apply@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: safe-regex-test@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: set-proto@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: stop-iteration-iterator@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: string.prototype.trim@1.2.11 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: string.prototype.trimend@1.0.10 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: string.prototype.trimstart@1.0.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: typed-array-buffer@1.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: typed-array-byte-length@1.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: typed-array-byte-offset@1.0.5 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: typed-array-length@1.0.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unbox-primitive@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: which-typed-array@1.1.24 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: possible-typed-array-names@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: has-tostringtag@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: es-abstract-get@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-date-object@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-symbol@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: functions-have-names@1.2.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-document.all@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: isarray@2.0.5 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: get-own-enumerable-property-symbols@3.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-obj@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-regexp@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-stream@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: temp-dir@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: type-fest@0.16.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unique-string@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @jridgewell/source-map@0.3.11 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: acorn@8.19.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: commander@2.20.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: source-map-support@0.5.21 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: buffer-from@1.1.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: source-map@0.6.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: for-each@0.3.5 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: reflect.getprototypeof@1.0.10 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: which-builtin-type@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: has-bigints@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: which-boxed-primitive@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unicode-canonical-property-names-ecmascript@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: unicode-property-aliases-ecmascript@2.2.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: crypto-random-string@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: isexe@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-bigint@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-boolean-object@1.2.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-number-object@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-async-function@2.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-finalizationregistry@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-generator-function@1.1.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: which-collection@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: async-function@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: generator-function@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-map@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-weakmap@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: is-weakset@2.0.4 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: idb@7.1.1 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: @types/trusted-types@2.0.7 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: brace-expansion@2.1.8 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error Missing: balanced-match@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error Clean install a project
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error Usage:
+2026-Nov-24 22:44:01
+#11 21.21 npm error npm ci
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error Options:
+2026-Nov-24 22:44:01
+#11 21.21 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [--no-bin-links] [--no-fund] [--dry-run]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+2026-Nov-24 22:44:01
+#11 21.21 npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-Nov-24 22:44:01
+#11 21.21 npm error
+2026-Nov-24 22:44:01
+#11 21.21 npm error Run "npm help ci" for more info
+2026-Nov-24 22:44:01
+#11 21.22 npm notice
+2026-Nov-24 22:44:01
+#11 21.22 npm notice New major version of npm available! 10.8.2 -> 12.2.3
+2026-Nov-24 22:44:01
+#11 21.22 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+2026-Nov-24 22:44:01
+#11 21.22 npm notice To update run: npm install -g npm@12.2.3
+2026-Nov-24 22:44:01
+#11 21.22 npm notice
+2026-Nov-24 22:44:01
+#11 21.22 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-24T22_43_38_521Z-debug-0.log
+2026-Nov-24 22:44:01
+#11 ...
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#10 [builder 5/7] RUN npm ci
+2026-Nov-24 22:44:01
+#10 21.50 npm error code EUSAGE
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: vite-plugin-pwa@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: pretty-bytes@6.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-build@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-window@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @apideck/better-ajv-errors@0.3.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: ajv@8.20.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/preset-env@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/runtime@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @rollup/plugin-babel@6.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @rollup/plugin-node-resolve@16.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @rollup/plugin-replace@6.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @rollup/plugin-terser@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @trickfilm400/rollup-plugin-off-main-thread@3.0.0-pre1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: common-tags@1.8.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: eta@4.6.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: fast-json-stable-stringify@2.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: fs-extra@9.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: glob@11.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: pretty-bytes@5.6.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: source-map@0.8.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: stringify-object@3.3.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: strip-comments@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: tempy@0.6.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: upath@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-background-sync@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-broadcast-update@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-cacheable-response@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-core@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-expiration@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-google-analytics@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-navigation-preload@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-precaching@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-range-requests@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-recipes@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-routing@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-strategies@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-streams@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: workbox-sw@7.4.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: jsonpointer@5.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: leven@3.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/helper-compilation-targets@7.29.7 does not satisfy @babel/helper-compilation-targets@7.29.13
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-firefox-class-in-computed-class-key@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-safari-class-field-initializer-scope@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-safari-rest-destructuring-rhs-array@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-bugfix-v8-static-class-fields-redefine-readonly@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-proposal-private-property-in-object@7.21.0-placeholder-for-preset-env.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-syntax-import-assertions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-syntax-import-attributes@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-syntax-unicode-sets-regex@7.18.6 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-arrow-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-async-generator-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-async-to-generator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-block-scoped-functions@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-block-scoping@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-class-properties@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-class-static-block@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-classes@7.29.11 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-computed-properties@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-destructuring@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-dotall-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-duplicate-keys@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-duplicate-named-capturing-groups-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-dynamic-import@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-explicit-resource-management@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-exponentiation-operator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-export-namespace-from@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-for-of@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-function-name@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-json-strings@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-logical-assignment-operators@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-member-expression-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-modules-amd@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-modules-commonjs@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-modules-systemjs@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-modules-umd@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-named-capturing-groups-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-new-target@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-nullish-coalescing-operator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-numeric-separator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-object-rest-spread@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-object-super@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-optional-catch-binding@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-optional-chaining@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-parameters@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-private-methods@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-private-property-in-object@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-property-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-regenerator@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-regexp-modifiers@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-reserved-words@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-shorthand-properties@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-spread@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-sticky-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-template-literals@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-typeof-symbol@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-unicode-escapes@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-unicode-property-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-unicode-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/plugin-transform-unicode-sets-regex@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/preset-modules@0.1.6-no-external-plugins from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: babel-plugin-polyfill-corejs2@0.4.17 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: babel-plugin-polyfill-corejs3@0.14.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: babel-plugin-polyfill-regenerator@0.6.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: core-js-compat@3.51.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-skip-transparent-expression-wrappers@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/traverse@7.29.7 does not satisfy @babel/traverse@7.29.15
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/types@7.29.7 does not satisfy @babel/types@7.29.15
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-create-regexp-features-plugin@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-annotate-as-pure@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regexpu-core@6.5.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-remap-async-to-generator@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-wrap-function@7.29.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-create-class-features-plugin@7.29.13 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-member-expression-to-functions@7.29.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-optimise-call-expression@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-replace-supers@7.29.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/helper-module-transforms@7.29.7 does not satisfy @babel/helper-module-transforms@7.29.14
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: esutils@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/generator@7.29.7 does not satisfy @babel/generator@7.29.15
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/parser@7.29.7 does not satisfy @babel/parser@7.29.15
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's @babel/helper-string-parser@7.29.7 does not satisfy @babel/helper-string-parser@7.29.15
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @rollup/pluginutils@5.5.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @types/resolve@1.20.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: deepmerge@4.3.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-module@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: resolve@1.22.14 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: serialize-javascript@7.1.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: smob@1.6.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: terser@5.51.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: estree-walker@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: ejs@3.1.10 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: string.prototype.matchall@4.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: fast-deep-equal@3.1.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: fast-uri@3.1.9 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: json-schema-traverse@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: require-from-string@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @babel/helper-define-polyfill-provider@0.6.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: lodash.debounce@4.0.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's browserslist@4.28.2 does not satisfy browserslist@4.29.6
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's baseline-browser-mapping@2.10.37 does not satisfy baseline-browser-mapping@2.11.39
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's caniuse-lite@1.0.30001799 does not satisfy caniuse-lite@1.0.30001828
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's electron-to-chromium@1.5.375 does not satisfy electron-to-chromium@1.5.493
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's node-releases@2.0.47 does not satisfy node-releases@2.0.65
+2026-Nov-24 22:44:01
+#10 21.50 npm error Invalid: lock file's update-browserslist-db@1.2.3 does not satisfy update-browserslist-db@1.4.0
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: jake@10.9.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: at-least-node@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: jsonfile@6.2.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: universalify@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: foreground-child@3.3.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: jackspeak@4.2.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: minimatch@10.2.6 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: minipass@7.1.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: package-json-from-dist@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: path-scurry@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: cross-spawn@7.0.6 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: signal-exit@4.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: path-key@3.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: shebang-command@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: which@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @isaacs/cliui@9.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: async@3.2.6 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: filelist@1.0.6 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: minimatch@5.1.9 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: brace-expansion@5.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: balanced-match@4.0.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: lru-cache@11.5.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regenerate@1.5.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regenerate-unicode-properties@10.3.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regjsgen@0.8.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regjsparser@0.14.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unicode-match-property-ecmascript@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unicode-match-property-value-ecmascript@2.2.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-core-module@2.18.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: path-parse@1.0.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: supports-preserve-symlinks-flag@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: shebang-regex@3.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: call-bind@1.0.9 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: define-properties@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: es-abstract@1.24.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: internal-slot@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: regexp.prototype.flags@1.5.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: set-function-name@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: set-function-length@1.2.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: define-data-property@1.1.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: has-property-descriptors@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: object-keys@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: array-buffer-byte-length@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: arraybuffer.prototype.slice@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: available-typed-arrays@1.0.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: data-view-buffer@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: data-view-byte-length@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: data-view-byte-offset@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: es-set-tostringtag@2.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: es-to-primitive@1.3.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: function.prototype.name@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: get-symbol-description@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: globalthis@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: has-proto@1.2.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-array-buffer@3.0.5 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-callable@1.2.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-data-view@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-negative-zero@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-regex@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-set@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-shared-array-buffer@1.0.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-string@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-typed-array@1.1.15 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-weakref@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: object.assign@4.1.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: own-keys@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: safe-array-concat@1.1.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: safe-push-apply@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: safe-regex-test@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: set-proto@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: stop-iteration-iterator@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: string.prototype.trim@1.2.11 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: string.prototype.trimend@1.0.10 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: string.prototype.trimstart@1.0.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: typed-array-buffer@1.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: typed-array-byte-length@1.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: typed-array-byte-offset@1.0.5 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: typed-array-length@1.0.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unbox-primitive@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: which-typed-array@1.1.24 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: possible-typed-array-names@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: has-tostringtag@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: es-abstract-get@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-date-object@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-symbol@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: functions-have-names@1.2.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-document.all@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: isarray@2.0.5 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: get-own-enumerable-property-symbols@3.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-obj@1.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-regexp@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-stream@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: temp-dir@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: type-fest@0.16.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unique-string@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @jridgewell/source-map@0.3.11 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: acorn@8.19.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: commander@2.20.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: source-map-support@0.5.21 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: buffer-from@1.1.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: source-map@0.6.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: for-each@0.3.5 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: reflect.getprototypeof@1.0.10 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: which-builtin-type@1.2.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: has-bigints@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: which-boxed-primitive@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unicode-canonical-property-names-ecmascript@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: unicode-property-aliases-ecmascript@2.2.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: crypto-random-string@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: isexe@2.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-bigint@1.1.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-boolean-object@1.2.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-number-object@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-async-function@2.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-finalizationregistry@1.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-generator-function@1.1.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: which-collection@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: async-function@1.0.0 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: generator-function@2.0.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-map@2.0.3 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-weakmap@2.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: is-weakset@2.0.4 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: idb@7.1.1 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: @types/trusted-types@2.0.7 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: brace-expansion@2.1.8 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error Missing: balanced-match@1.0.2 from lock file
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error Clean install a project
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error Usage:
+2026-Nov-24 22:44:01
+#10 21.50 npm error npm ci
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error Options:
+2026-Nov-24 22:44:01
+#10 21.50 npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [--no-bin-links] [--no-fund] [--dry-run]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+2026-Nov-24 22:44:01
+#10 21.50 npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-Nov-24 22:44:01
+#10 21.50 npm error
+2026-Nov-24 22:44:01
+#10 21.50 npm error Run "npm help ci" for more info
+2026-Nov-24 22:44:01
+#10 21.51 npm notice
+2026-Nov-24 22:44:01
+#10 21.51 npm notice New major version of npm available! 10.8.2 -> 12.2.3
+2026-Nov-24 22:44:01
+#10 21.51 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+2026-Nov-24 22:44:01
+#10 21.51 npm notice To update run: npm install -g npm@12.2.3
+2026-Nov-24 22:44:01
+#10 21.51 npm notice
+2026-Nov-24 22:44:01
+#10 21.51 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-24T22_43_38_563Z-debug-0.log
+2026-Nov-24 22:44:01
+#10 ERROR: process "/bin/sh -c npm ci" did not complete successfully: exit code: 1
+2026-Nov-24 22:44:01
+2026-Nov-24 22:44:01
+#11 [stage-1 4/5] RUN npm ci --only=production
+2026-Nov-24 22:44:01
+#11 ERROR: process "/bin/sh -c npm ci --only=production" did not complete successfully: exit code: 1
+2026-Nov-24 22:44:01
+------
+2026-Nov-24 22:44:01
+> [stage-1 4/5] RUN npm ci --only=production:
+2026-Nov-24 22:44:01
+21.21 npm error
+2026-Nov-24 22:44:01
+21.21 npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-Nov-24 22:44:01
+21.21 npm error
+2026-Nov-24 22:44:01
+21.21 npm error Run "npm help ci" for more info
+2026-Nov-24 22:44:01
+21.22 npm notice
+2026-Nov-24 22:44:01
+21.22 npm notice New major version of npm available! 10.8.2 -> 12.2.3
+2026-Nov-24 22:44:01
+21.22 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+2026-Nov-24 22:44:01
+21.22 npm notice To update run: npm install -g npm@12.2.3
+2026-Nov-24 22:44:01
+21.22 npm notice
+2026-Nov-24 22:44:01
+21.22 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-24T22_43_38_521Z-debug-0.log
+2026-Nov-24 22:44:01
+------
+2026-Nov-24 22:44:01
+------
+2026-Nov-24 22:44:01
+> [builder 5/7] RUN npm ci:
+2026-Nov-24 22:44:01
+21.50 npm error
+2026-Nov-24 22:44:01
+21.50 npm error aliases: clean-install, ic, install-clean, isntall-clean
+2026-Nov-24 22:44:01
+21.50 npm error
+2026-Nov-24 22:44:01
+21.50 npm error Run "npm help ci" for more info
+2026-Nov-24 22:44:01
+21.51 npm notice
+2026-Nov-24 22:44:01
+21.51 npm notice New major version of npm available! 10.8.2 -> 12.2.3
+2026-Nov-24 22:44:01
+21.51 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+2026-Nov-24 22:44:01
+21.51 npm notice To update run: npm install -g npm@12.2.3
+2026-Nov-24 22:44:01
+21.51 npm notice
+2026-Nov-24 22:44:01
+21.51 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-24T22_43_38_563Z-debug-0.log
+2026-Nov-24 22:44:01
+------
+2026-Nov-24 22:44:01
+Dockerfile:16
+2026-Nov-24 22:44:01
+--------------------
+2026-Nov-24 22:44:01
+14 |
+2026-Nov-24 22:44:01
+15 |     COPY package*.json ./
+2026-Nov-24 22:44:01
+16 | >>> RUN npm ci
+2026-Nov-24 22:44:01
+17 |
+2026-Nov-24 22:44:01
+18 |     COPY . .
+2026-Nov-24 22:44:01
+--------------------
+2026-Nov-24 22:44:01
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm ci" did not complete successfully: exit code: 1
+2026-Nov-24 22:44:01
+========================================
+2026-Nov-24 22:44:01
+Deployment failed. Removing the new version of your application.

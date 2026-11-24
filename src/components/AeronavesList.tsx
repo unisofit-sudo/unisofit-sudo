@@ -15,6 +15,7 @@ interface AeronavesListProps {
   onAddAeronave: (aeronave: Omit<Aeronave, 'id'>) => Promise<void>;
   onUpdateAeronave: (aeronave: Aeronave) => Promise<void>;
   onDeleteAeronave: (id: string) => Promise<void>;
+  readOnlyPilot?: boolean;
 }
 
 export default function AeronavesList({
@@ -24,7 +25,8 @@ export default function AeronavesList({
   selectedAeronaveId,
   onAddAeronave,
   onUpdateAeronave,
-  onDeleteAeronave
+  onDeleteAeronave,
+  readOnlyPilot = false,
 }: AeronavesListProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAeronave, setEditingAeronave] = useState<Aeronave | null>(null);
@@ -135,18 +137,24 @@ export default function AeronavesList({
             <Plane className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-white tracking-tight text-base">Aeronaves</h2>
-            <p className="text-xs text-sky-400 font-semibold">Cliente: {selectedCliente.nome}</p>
+            <h2 className="font-display font-bold text-white tracking-tight text-base">
+              {readOnlyPilot ? 'Selecione a Aeronave' : 'Aeronaves'}
+            </h2>
+            <p className="text-xs text-sky-400 font-semibold">
+              {readOnlyPilot ? `Diário de Bordo • ${selectedCliente.nome}` : `Cliente: ${selectedCliente.nome}`}
+            </p>
           </div>
         </div>
-        <button
-          onClick={startNewForm}
-          className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold py-1.5 px-3 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-500/10"
-          id="btn-nova-aeronave"
-        >
-          <Plus className="w-4 h-4" />
-          Cadastrar Aeronave
-        </button>
+        {!readOnlyPilot && (
+          <button
+            onClick={startNewForm}
+            className="flex items-center gap-1 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold py-1.5 px-3 rounded-xl transition-all cursor-pointer shadow-md shadow-sky-500/10"
+            id="btn-nova-aeronave"
+          >
+            <Plus className="w-4 h-4" />
+            Cadastrar Aeronave
+          </button>
+        )}
       </div>
 
       {/* Lista de Aeronaves */}
@@ -201,25 +209,27 @@ export default function AeronavesList({
                 </div>
 
                 <div className="flex items-center justify-between md:justify-end gap-3 border-t pt-3 md:border-t-0 md:pt-0 border-slate-800/60">
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={(e) => handleEdit(a, e)}
-                      className="p-1.5 text-slate-400 hover:text-sky-450 hover:bg-slate-800/60 rounded-lg transition-colors"
-                      title="Editar Aeronave"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(a.id, e)}
-                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800/60 rounded-lg transition-colors"
-                      title="Excluir Aeronave"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {!readOnlyPilot && (
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => handleEdit(a, e)}
+                        className="p-1.5 text-slate-400 hover:text-sky-450 hover:bg-slate-800/60 rounded-lg transition-colors"
+                        title="Editar Aeronave"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(a.id, e)}
+                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800/60 rounded-lg transition-colors"
+                        title="Excluir Aeronave"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   
                   <div className="flex items-center text-xs text-sky-450 font-bold gap-0.5 hover:translate-x-1 transition-transform">
-                    <span>Acessar Painel</span>
+                    <span>{readOnlyPilot ? 'Abrir Diário de Bordo' : 'Acessar Painel'}</span>
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>

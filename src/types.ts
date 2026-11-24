@@ -27,6 +27,18 @@ export interface UsuarioOficina {
   created_at?: string;
 }
 
+export interface UsuarioPiloto {
+  id: string;
+  clienteId: string;
+  nome: string;
+  canac: string; // 6 dígitos numéricos (usado como login)
+  email?: string; // Opcional
+  senha: string;
+  tipoPrazo: 'indeterminado' | 'determinado';
+  prazoAcesso?: string; // YYYY-MM-DD
+  created_at?: string;
+}
+
 export interface Aeronave {
   id: string;
   matricula: string; // Prefixo, ex: PT-XYZ
@@ -134,6 +146,7 @@ export interface AlertaManutencao {
   idComponente: string;
   nomeComponente: string;
   tipoItem?: 'componente' | 'inspecao';
+  sistema?: 'celula' | 'motor' | 'helice';
   metric: 'horas' | 'dias' | 'ambas';
   
   // Horas

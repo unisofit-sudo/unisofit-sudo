@@ -29,6 +29,12 @@ import {
   addUsuarioOficina,
   updateUsuarioOficina,
   deleteUsuarioOficina,
+  getUsuariosPilotos,
+  getUsuarioPilotoByEmail,
+  getUsuarioPilotoByCanac,
+  addUsuarioPiloto,
+  updateUsuarioPiloto,
+  deleteUsuarioPiloto,
   getInspecoesPeriodicas,
   addInspecaoPeriodica,
   updateInspecaoPeriodica,
@@ -77,10 +83,11 @@ async function startServer() {
   app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios.' });
+      return res.status(400).json({ success: false, error: 'Login (E-mail ou Código ANAC) e senha são obrigatórios.' });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
+    const rawIdentifier = String(email).trim();
+    const cleanEmail = rawIdentifier.toLowerCase();
 
     // 1. Verifica se é administrador
     if (cleanEmail === 'lucas.trombeta@unisofit.com.br' && password === 'Unis0fit2011@') {
@@ -140,7 +147,42 @@ async function startServer() {
         });
       }
 
-      res.status(401).json({ success: false, error: 'E-mail ou senha inválidos.' });
+      // 4. Busca na base de pilotos pelo código ANAC (acesso exclusivo ao Diário de Bordo)
+      const isCanacFormat = /^\d{6}$/.test(rawIdentifier.replace(/\s+/g, ''));
+      const pilotoUser = isCanacFormat
+        ? await getUsuarioPilotoByCanac(rawIdentifier)
+        : (cleanEmail.includes('@') ? await getUsuarioPilotoByEmail(cleanEmail) : null);
+
+      if (pilotoUser && pilotoUser.senha === password) {
+        if (pilotoUser.tipoPrazo === 'determinado' && pilotoUser.prazoAcesso) {
+          const today = new Date().toISOString().split('T')[0];
+          if (pilotoUser.prazoAcesso < today) {
+            return res.status(403).json({
+              success: false,
+              error: `Acesso expirado! O período concedido para este piloto terminou em ${pilotoUser.prazoAcesso.split('-').reverse().join('/')}.`
+            });
+          }
+        }
+
+        const ownerClient = clientes.find(c => c.id === pilotoUser.clienteId);
+        if (!ownerClient) {
+          return res.status(404).json({ success: false, error: 'Cliente proprietário associado a este piloto não encontrado.' });
+        }
+
+        return res.json({
+          success: true,
+          role: 'piloto',
+          user: ownerClient,
+          pilotoUser: {
+            id: pilotoUser.id,
+            nome: pilotoUser.nome,
+            email: pilotoUser.email || '',
+            canac: pilotoUser.canac || ''
+          }
+        });
+      }
+
+      res.status(401).json({ success: false, error: 'Credenciais ou senha inválidos.' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: 'Erro ao autenticar usuário no banco de dados. Verifique a conexão com o banco.' });
     }
@@ -230,6 +272,74 @@ async function startServer() {
   app.delete('/api/usuarios-oficina/:id', async (req, res) => {
     try {
       await deleteUsuarioOficina(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- USUÁRIOS PILOTOS (DIÁRIO DE BORDO) ---
+  app.get('/api/usuarios-pilotos', async (req, res) => {
+    try {
+      const { clienteId } = req.query;
+      if (!clienteId) {
+        return res.status(400).json({ error: 'O ID do cliente (clienteId) é obrigatório.' });
+      }
+      const list = await getUsuariosPilotos(String(clienteId));
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/usuarios-pilotos', async (req, res) => {
+    try {
+      const user = req.body;
+      if (!user.id) user.id = 'plt_' + Math.random().toString(36).substr(2, 9);
+      if (!user.clienteId) {
+        return res.status(400).json({ error: 'O ID do cliente (clienteId) é obrigatório.' });
+      }
+      user.canac = user.canac ? String(user.canac).replace(/\D/g, '').slice(0, 6) : '';
+      if (user.canac.length !== 6) {
+        return res.status(400).json({ error: 'O código ANAC (6 números) é obrigatório para o login do piloto.' });
+      }
+      const existing = await getUsuarioPilotoByCanac(user.canac);
+      if (existing) {
+        return res.status(400).json({ error: 'Já existe um piloto cadastrado com este código ANAC.' });
+      }
+      user.email = user.email ? String(user.email).trim() : '';
+      const created = await addUsuarioPiloto(user);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/usuarios-pilotos', async (req, res) => {
+    try {
+      const user = req.body;
+      if (!user.id) {
+        return res.status(400).json({ error: 'O ID do piloto é obrigatório.' });
+      }
+      user.canac = user.canac ? String(user.canac).replace(/\D/g, '').slice(0, 6) : '';
+      if (user.canac.length !== 6) {
+        return res.status(400).json({ error: 'O código ANAC (6 números) é obrigatório para o login do piloto.' });
+      }
+      const existing = await getUsuarioPilotoByCanac(user.canac);
+      if (existing && existing.id !== user.id) {
+        return res.status(400).json({ error: 'Já existe outro piloto cadastrado com este código ANAC.' });
+      }
+      user.email = user.email ? String(user.email).trim() : '';
+      const updated = await updateUsuarioPiloto(user);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/usuarios-pilotos/:id', async (req, res) => {
+    try {
+      await deleteUsuarioPiloto(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, UsuarioOficina } from '../types';
+import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, UsuarioOficina, UsuarioPiloto } from '../types';
 
 let pool: Pool | null = null;
 let dbConnectionError: string | null = null;
@@ -290,6 +290,22 @@ export async function initDb() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_cliente_oficina FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS usuarios_pilotos (
+          id VARCHAR(100) PRIMARY KEY,
+          cliente_id VARCHAR(100) NOT NULL,
+          nome VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
+          senha VARCHAR(255) NOT NULL,
+          canac VARCHAR(6),
+          tipo_prazo VARCHAR(50) DEFAULT 'indeterminado',
+          prazo_acesso VARCHAR(20),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_cliente_piloto FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+        );
+
+        ALTER TABLE usuarios_pilotos ALTER COLUMN email DROP NOT NULL;
+        ALTER TABLE usuarios_pilotos DROP CONSTRAINT IF EXISTS usuarios_pilotos_email_key;
 
         CREATE TABLE IF NOT EXISTS inspecoes_periodicas (
           id VARCHAR(100) PRIMARY KEY,
@@ -877,6 +893,122 @@ export async function deleteUsuarioOficina(id: string): Promise<void> {
     await p.query('DELETE FROM usuarios_oficina WHERE id = $1', [id]);
   } catch (err: any) {
     setDbConnectionError('Erro ao deletar usuário de oficina: ' + err.message);
+    throw err;
+  }
+}
+
+// GERENCIAMENTO DE PILOTOS (ACESSO EXCLUSIVO AO DIÁRIO DE BORDO)
+export async function getUsuariosPilotos(clienteId: string): Promise<UsuarioPiloto[]> {
+  try {
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM usuarios_pilotos WHERE cliente_id = $1 ORDER BY nome ASC', [clienteId]);
+    return res.rows.map(row => ({
+      id: row.id,
+      clienteId: row.cliente_id,
+      nome: row.nome,
+      email: row.email || undefined,
+      senha: row.senha,
+      canac: row.canac || '',
+      tipoPrazo: row.tipo_prazo as 'indeterminado' | 'determinado',
+      prazoAcesso: row.prazo_acesso || undefined,
+      created_at: row.created_at
+    }));
+  } catch (err: any) {
+    setDbConnectionError('Erro ao consultar pilotos: ' + err.message);
+    throw err;
+  }
+}
+
+export async function getUsuarioPilotoByEmail(email: string): Promise<UsuarioPiloto | null> {
+  try {
+    const clean = email.toLowerCase().trim();
+    if (!clean) return null;
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM usuarios_pilotos WHERE LOWER(email) = $1', [clean]);
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      clienteId: row.cliente_id,
+      nome: row.nome,
+      email: row.email || undefined,
+      senha: row.senha,
+      canac: row.canac || '',
+      tipoPrazo: row.tipo_prazo as 'indeterminado' | 'determinado',
+      prazoAcesso: row.prazo_acesso || undefined,
+      created_at: row.created_at
+    };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao buscar piloto por e-mail: ' + err.message);
+    throw err;
+  }
+}
+
+export async function getUsuarioPilotoByCanac(canac: string): Promise<UsuarioPiloto | null> {
+  try {
+    const clean = String(canac || '').replace(/\D/g, '').slice(0, 6);
+    if (!clean) return null;
+    const p = checkPool();
+    const res = await p.query('SELECT * FROM usuarios_pilotos WHERE canac = $1', [clean]);
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      clienteId: row.cliente_id,
+      nome: row.nome,
+      email: row.email || undefined,
+      senha: row.senha,
+      canac: row.canac || '',
+      tipoPrazo: row.tipo_prazo as 'indeterminado' | 'determinado',
+      prazoAcesso: row.prazo_acesso || undefined,
+      created_at: row.created_at
+    };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao buscar piloto por código ANAC: ' + err.message);
+    throw err;
+  }
+}
+
+export async function addUsuarioPiloto(usuario: UsuarioPiloto): Promise<UsuarioPiloto> {
+  try {
+    const p = checkPool();
+    const { id, clienteId, nome, email, senha, canac, tipoPrazo, prazoAcesso } = usuario;
+    const normalizedEmail = email && email.trim() ? email.toLowerCase().trim() : null;
+    const normalizedCanac = String(canac || '').replace(/\D/g, '').slice(0, 6);
+    await p.query(
+      'INSERT INTO usuarios_pilotos (id, cliente_id, nome, email, senha, canac, tipo_prazo, prazo_acesso) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [id, clienteId, nome, normalizedEmail, senha, normalizedCanac || null, tipoPrazo, prazoAcesso || null]
+    );
+    return { ...usuario, email: normalizedEmail || undefined, canac: normalizedCanac };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar piloto: ' + err.message);
+    throw err;
+  }
+}
+
+export async function updateUsuarioPiloto(usuario: UsuarioPiloto): Promise<UsuarioPiloto> {
+  try {
+    const p = checkPool();
+    const { id, nome, email, senha, canac, tipoPrazo, prazoAcesso } = usuario;
+    const normalizedEmail = email && email.trim() ? email.toLowerCase().trim() : null;
+    const normalizedCanac = String(canac || '').replace(/\D/g, '').slice(0, 6);
+    await p.query(
+      'UPDATE usuarios_pilotos SET nome = $1, email = $2, senha = $3, canac = $4, tipo_prazo = $5, prazo_acesso = $6 WHERE id = $7',
+      [nome, normalizedEmail, senha, normalizedCanac || null, tipoPrazo, prazoAcesso || null, id]
+    );
+    return { ...usuario, email: normalizedEmail || undefined, canac: normalizedCanac };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar piloto: ' + err.message);
+    throw err;
+  }
+}
+
+export async function deleteUsuarioPiloto(id: string): Promise<void> {
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM usuarios_pilotos WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar piloto: ' + err.message);
     throw err;
   }
 }

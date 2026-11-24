@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cliente, UsuarioOficina } from '../types';
-import { User, Phone, Mail, FileText, Search, Plus, Trash2, Edit2, Users, MapPin, MessageSquare, Lock, Key, Clock, ShieldAlert, Wrench, ChevronRight } from 'lucide-react';
+import { PilotosModal } from './PilotosModal';
+import { User, Phone, Mail, Search, Plus, Trash2, Edit2, Users, MapPin, MessageSquare, Lock, Key, Clock, Compass } from 'lucide-react';
 
 interface ClientesListProps {
   clientes: Cliente[];
@@ -42,6 +43,7 @@ export default function ClientesList({
 
   // Gerenciamento de Usuários de Oficina (Acesso à Documentação)
   const [managingOficinaCliente, setManagingOficinaCliente] = useState<Cliente | null>(null);
+  const [managingPilotosCliente, setManagingPilotosCliente] = useState<Cliente | null>(null);
   const [oficinaUsers, setOficinaUsers] = useState<UsuarioOficina[]>([]);
   const [loadingOficina, setLoadingOficina] = useState(false);
   
@@ -355,6 +357,16 @@ export default function ClientesList({
 
                 {/* Ações */}
                 <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setManagingPilotosCliente(c);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-700/60 transition-colors"
+                    title="Cadastro de Pilotos (Diário de Bordo)"
+                  >
+                    <Compass className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -758,6 +770,13 @@ export default function ClientesList({
             </div>
           </div>
         </div>
+      )}
+
+      {managingPilotosCliente && (
+        <PilotosModal
+          cliente={managingPilotosCliente}
+          onClose={() => setManagingPilotosCliente(null)}
+        />
       )}
     </div>
   );

@@ -146,6 +146,8 @@ export function calcularAlerta(
   return {
     idComponente: comp.id,
     nomeComponente: comp.nome,
+    tipoItem: 'componente',
+    sistema: sistema || 'celula',
     metric,
     horasRestantes: limiteHoras > 0 ? horasRestantes : 0,
     horasLimite,
@@ -246,6 +248,7 @@ export function calcularAlertaInspecao(
     idComponente: insp.id,
     nomeComponente: insp.nome,
     tipoItem: 'inspecao',
+    sistema: sistema || 'celula',
     metric,
     horasRestantes: limiteHoras > 0 ? horasRestantes : 0,
     horasLimite,

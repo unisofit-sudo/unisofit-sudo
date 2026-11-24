@@ -44,16 +44,27 @@ interface AeronaveDetailProps {
   aeronave: Aeronave;
   cliente: Cliente;
   onRefreshAeronave: () => void;
-  userRole?: 'admin' | 'cliente' | 'oficina' | null;
+  userRole?: 'admin' | 'cliente' | 'oficina' | 'piloto' | null;
+  pilotoUser?: { id: string; nome: string; email: string; canac?: string } | null;
 }
 
 export default function AeronaveDetail({
   aeronave,
   cliente,
   onRefreshAeronave,
-  userRole
+  userRole,
+  pilotoUser
 }: AeronaveDetailProps) {
-  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'inspecoes' | 'voos' | 'laudos'>('mapa');
+  const isPilotOnly = userRole === 'piloto';
+  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'inspecoes' | 'voos' | 'laudos'>(
+    isPilotOnly ? 'voos' : 'mapa'
+  );
+
+  useEffect(() => {
+    if (isPilotOnly && activeTab !== 'voos') {
+      setActiveTab('voos');
+    }
+  }, [isPilotOnly, activeTab]);
   
   // Dados dinâmicos buscados do servidor
   const [componentes, setComponentes] = useState<ComponenteControlado[]>([]);
@@ -62,6 +73,9 @@ export default function AeronaveDetail({
   const [revisoes, setRevisoes] = useState<RevisaoLaudo[]>([]);
   const [loading, setLoading] = useState(false);
   const [alertFilter, setAlertFilter] = useState<'todos' | 'critico' | 'atencao'>('todos');
+  const [mapaSistemaFilter, setMapaSistemaFilter] = useState<'todos' | 'celula' | 'motor' | 'helice'>('todos');
+  const [compSistemaFilter, setCompSistemaFilter] = useState<'todos' | 'celula' | 'motor' | 'helice'>('todos');
+  const [inspSistemaFilter, setInspSistemaFilter] = useState<'todos' | 'celula' | 'motor'>('todos');
 
   // Formulário: Diário de Bordo (Voo)
   const [isVooFormOpen, setIsVooFormOpen] = useState(false);
@@ -240,9 +254,14 @@ export default function AeronaveDetail({
   const alertasComponentes = calcularTodosAlertas(componentes, aeronave);
   const alertasInspecoes = calcularTodosAlertasInspecoes(inspecoes, aeronave);
   const alertas = [...alertasComponentes, ...alertasInspecoes];
-  const alertasFiltrados = alertas.filter(a => {
+  const alertasPorStatus = alertas.filter(a => {
     if (alertFilter === 'critico') return a.status === 'critico';
     if (alertFilter === 'atencao') return a.status === 'atencao';
+    return true;
+  });
+  const alertasFiltrados = alertasPorStatus.filter(a => {
+    const sis = a.sistema || 'celula';
+    if (mapaSistemaFilter !== 'todos') return sis === mapaSistemaFilter;
     return true;
   });
 
@@ -260,8 +279,8 @@ export default function AeronaveDetail({
     setVooCorte('');
     setVooPax('');
     setVooPc('');
-    setVooPiloto('');
-    setVooCanac('');
+    setVooPiloto(pilotoUser?.nome || '');
+    setVooCanac(pilotoUser?.canac || '');
     setVooDescricao('');
     setVooFormError('');
     setIsVooFormOpen(true);
@@ -738,111 +757,130 @@ export default function AeronaveDetail({
           </div>
         </div>
 
-        {/* Linha divisória discreta */}
-        <div className="h-px bg-slate-700/20 w-full" />
+        {!isPilotOnly && (
+          <>
+            {/* Linha divisória discreta */}
+            <div className="h-px bg-slate-700/20 w-full" />
 
-        {/* Contador de Alertas Rápidos - Sem absolute para evitar escritos sobrepostos */}
-        <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider">
-          <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            <span>Componentes Monitorados: <strong>{componentes.length}</strong></span>
-          </div>
+            {/* Contador de Alertas Rápidos - Sem absolute para evitar escritos sobrepostos */}
+            <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold tracking-wider">
+              <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span>Componentes Monitorados: <strong>{componentes.length}</strong></span>
+              </div>
 
-          <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
-            <span className="h-2 w-2 rounded-full bg-sky-500"></span>
-            <span>Inspeções Periódicas: <strong>{inspecoes.length}</strong></span>
-          </div>
+              <div className="flex items-center gap-2 bg-slate-900/30 px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-sky-500"></span>
+                <span>Inspeções Periódicas: <strong>{inspecoes.length}</strong></span>
+              </div>
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('mapa'); setAlertFilter('critico'); }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-              countCriticos > 0 
-                ? 'bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25 animate-pulse' 
-                : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
-            }`}
-          >
-            <span className={`h-2 w-2 rounded-full ${countCriticos > 0 ? 'bg-red-500' : 'bg-slate-600'}`}></span>
-            <span>Vencidos / Críticos: <strong>{countCriticos}</strong></span>
-          </button>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('mapa'); setAlertFilter('critico'); }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                  countCriticos > 0 
+                    ? 'bg-red-500/15 border-red-500/30 text-red-300 hover:bg-red-500/25 animate-pulse' 
+                    : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${countCriticos > 0 ? 'bg-red-500' : 'bg-slate-600'}`}></span>
+                <span>Vencidos / Críticos: <strong>{countCriticos}</strong></span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('mapa'); setAlertFilter('atencao'); }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-              countAtencao > 0 
-                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25' 
-                : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
-            }`}
-          >
-            <span className={`h-2 w-2 rounded-full ${countAtencao > 0 ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
-            <span>Alerta de Atenção: <strong>{countAtencao}</strong></span>
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('mapa'); setAlertFilter('atencao'); }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                  countAtencao > 0 
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25' 
+                    : 'bg-slate-900/30 border-slate-700/30 text-slate-400 hover:bg-slate-800/40'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${countAtencao > 0 ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
+                <span>Alerta de Atenção: <strong>{countAtencao}</strong></span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap border-b border-slate-700/40 gap-1 bg-slate-900/30 p-1 rounded-2xl w-fit">
-        <button
-          onClick={() => setActiveTab('mapa')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
-            activeTab === 'mapa'
-              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4" />
-          Mapa de Controle & Alertas
-        </button>
+      {isPilotOnly ? (
+        <div className="flex items-center justify-between bg-slate-900/40 border border-slate-700/40 px-4 py-3 rounded-2xl">
+          <div className="flex items-center gap-2.5 text-sky-400 text-xs font-bold uppercase tracking-wider">
+            <History className="w-4 h-4" />
+            <span>Diário de Bordo Digital ({voos.length} registros)</span>
+          </div>
+          {pilotoUser?.nome && (
+            <span className="text-[11px] text-slate-400">
+              Piloto: <strong className="text-slate-200">{pilotoUser.nome}</strong>
+              {pilotoUser.canac ? ` • CANAC ${pilotoUser.canac}` : ''}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap border-b border-slate-700/40 gap-1 bg-slate-900/30 p-1 rounded-2xl w-fit">
+          <button
+            onClick={() => setActiveTab('mapa')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'mapa'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            Mapa de Controle & Alertas
+          </button>
 
-        <button
-          onClick={() => setActiveTab('componentes')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
-            activeTab === 'componentes'
-              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-          }`}
-        >
-          <Wrench className="w-4 h-4" />
-          Componentes Controlados ({componentes.length})
-        </button>
+          <button
+            onClick={() => setActiveTab('componentes')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'componentes'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            Componentes Controlados ({componentes.length})
+          </button>
 
-        <button
-          onClick={() => setActiveTab('inspecoes')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
-            activeTab === 'inspecoes'
-              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-          }`}
-        >
-          <ClipboardCheck className="w-4 h-4" />
-          Inspeções Periódicas ({inspecoes.length})
-        </button>
+          <button
+            onClick={() => setActiveTab('inspecoes')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'inspecoes'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Inspeções Periódicas ({inspecoes.length})
+          </button>
 
-        <button
-          onClick={() => setActiveTab('voos')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
-            activeTab === 'voos'
-              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          Diário de Bordo ({voos.length})
-        </button>
+          <button
+            onClick={() => setActiveTab('voos')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'voos'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            Diário de Bordo ({voos.length})
+          </button>
 
-        <button
-          onClick={() => setActiveTab('laudos')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
-            activeTab === 'laudos'
-              ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          Laudos & Inspeções ({revisoes.length})
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveTab('laudos')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'laudos'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Laudos & Inspeções ({revisoes.length})
+          </button>
+        </div>
+      )}
 
       {/* --- CONTEÚDO DA TAB --- */}
       <div className="bg-slate-800/20 rounded-2xl border border-slate-700/50 p-6 shadow-xl" id="tab-content" style={{ contentVisibility: 'auto' }}>
@@ -860,7 +898,7 @@ export default function AeronaveDetail({
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
               <div>
                 <h3 className="text-base font-display font-bold text-white tracking-tight">Inspeções Periódicas & Gargalos</h3>
-                <p className="text-xs text-slate-400">Status automatizado com base nas horas de voo atuais ({aeronave.horasTotais.toFixed(1)} hs)</p>
+                <p className="text-xs text-slate-400">Status automatizado com base nas horas de voo atuais (Célula: {aeronave.horasTotais.toFixed(1)} hs • Motor: {(aeronave.horasMotor || 0).toFixed(1)} hs • Hélice: {(aeronave.horasHelice || 0).toFixed(1)} hs)</p>
               </div>
               <div className="flex items-center gap-2">
                 {/* Filtro do Alerta */}
@@ -885,302 +923,380 @@ export default function AeronaveDetail({
               </div>
             </div>
 
+            {/* Filtro por Sistema (Célula / Motor / Hélice) */}
+            <div className="flex flex-wrap items-center gap-2 bg-slate-900/40 p-2 rounded-xl border border-slate-800/70 w-fit">
+              {(
+                [
+                  { id: 'todos', label: 'Todos', count: alertasPorStatus.length, activeClass: 'bg-slate-700 text-white border-slate-500' },
+                  { id: 'celula', label: 'Célula', count: alertasPorStatus.filter(a => (a.sistema || 'celula') === 'celula').length, activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+                  { id: 'motor', label: 'Motor', count: alertasPorStatus.filter(a => a.sistema === 'motor').length, activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+                  { id: 'helice', label: 'Hélice', count: alertasPorStatus.filter(a => a.sistema === 'helice').length, activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setMapaSistemaFilter(opt.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    mapaSistemaFilter === opt.id
+                      ? opt.activeClass
+                      : 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <span className="text-[10px] font-mono opacity-80">({opt.count})</span>
+                </button>
+              ))}
+            </div>
+
             {alertasFiltrados.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-6 text-slate-400 text-xs font-mono">
-                {alertFilter === 'todos' 
+                {alertFilter === 'todos' && mapaSistemaFilter === 'todos'
                   ? 'Nenhum componente ou inspeção periódica cadastrado para emissão de alertas.'
-                  : 'Nenhum item se enquadra no status selecionado.'}
+                  : 'Nenhum item se enquadra nos filtros selecionados.'}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-5">
-                {alertasFiltrados.map((al) => {
-                  const isInspecao = al.tipoItem === 'inspecao';
-                  const compOriginal = !isInspecao ? componentes.find(c => c.id === al.idComponente) : undefined;
-                  const inspOriginal = isInspecao ? inspecoes.find(i => i.id === al.idComponente) : undefined;
-                  if (!compOriginal && !inspOriginal) return null;
+              <div className="space-y-8">
+                {(
+                  [
+                    {
+                      key: 'celula' as const,
+                      title: 'Célula',
+                      hours: aeronave.horasTotais,
+                      badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+                      dotClass: 'bg-sky-400',
+                    },
+                    {
+                      key: 'motor' as const,
+                      title: 'Motor',
+                      hours: aeronave.horasMotor || 0,
+                      badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                      dotClass: 'bg-emerald-400',
+                    },
+                    {
+                      key: 'helice' as const,
+                      title: 'Hélice',
+                      hours: aeronave.horasHelice || 0,
+                      badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                      dotClass: 'bg-amber-400',
+                    },
+                  ]
+                )
+                  .filter((sec) => mapaSistemaFilter === 'todos' || mapaSistemaFilter === sec.key)
+                  .map((sec) => {
+                    const groupAlertas = alertasFiltrados.filter((al) => (al.sistema || 'celula') === sec.key);
+                    if (groupAlertas.length === 0) return null;
 
-                  const sistema = isInspecao ? inspOriginal!.sistema : compOriginal!.sistema;
-                  const limiteHoras = isInspecao ? inspOriginal!.limiteHoras : compOriginal!.limiteHoras;
-                  const limiteDias = isInspecao ? inspOriginal!.limiteDias : compOriginal!.limiteDias;
-                  
-                  // Detalhes estéticos conforme nível de risco
-                  let cardBorderClass = 'border-slate-800 bg-slate-900/10';
-                  let bgAlertClass = 'bg-emerald-500/10 text-emerald-405 border border-emerald-500/20';
-                  let textAlertClass = 'text-emerald-450 font-mono font-semibold';
-                  let statusLabel = 'REGULAR';
-                  
-                  if (al.status === 'critico') {
-                    cardBorderClass = 'border-red-500/40 bg-red-950/10 relative shadow-sm shadow-red-500/5';
-                    bgAlertClass = 'bg-red-500/20 text-red-300 border border-red-500/30';
-                    textAlertClass = 'text-red-400 font-extrabold font-mono';
-                    statusLabel = '⚠️ CRÍTICO / VENCIDO';
-                  } else if (al.status === 'atencao') {
-                    cardBorderClass = 'border-amber-500/40 bg-amber-950/10 relative shadow-sm shadow-amber-500/5';
-                    bgAlertClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
-                    textAlertClass = 'text-amber-300 font-bold font-mono';
-                    statusLabel = '⚡ ATENÇÃO / PRAZO PRÓXIMO';
-                  }
-
-                  return (
-                    <div
-                      key={`${al.tipoItem || 'comp'}-${al.idComponente}`}
-                      className={`border rounded-2xl p-5 ${cardBorderClass} flex flex-col md:flex-row justify-between gap-5 transition-all`}
-                      id={`alert-card-${al.idComponente}`}
-                    >
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-start justify-between md:justify-start gap-3">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${bgAlertClass}`}>
-                                {statusLabel}
-                              </span>
-                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
-                                isInspecao
-                                  ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                                  : 'bg-slate-800 text-slate-300 border-slate-700'
-                              }`}>
-                                {isInspecao ? 'Inspeção Periódica' : 'Componente'}
-                              </span>
-                              <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
-                                sistema === 'motor'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                  : sistema === 'helice'
-                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                  : 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-                              }`}>
-                                {sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'}
-                              </span>
-                            </div>
-                            <h4 className="font-display font-extrabold text-sm text-white tracking-tight leading-none">{al.nomeComponente}</h4>
-                            {isInspecao && inspOriginal ? (
-                              <div className="text-[10px] text-slate-400 mt-1.5 space-y-0.5">
-                                {inspOriginal.oficinaExecutante && (
-                                  <p>Oficina: <strong className="text-emerald-400">{inspOriginal.oficinaExecutante}</strong></p>
-                                )}
-                                {inspOriginal.conteudo && (
-                                  <p className="text-slate-300 line-clamp-2">{inspOriginal.conteudo}</p>
-                                )}
-                                {inspOriginal.observacao && (
-                                  <p className="text-slate-400 italic line-clamp-1">Obs: {inspOriginal.observacao}</p>
-                                )}
-                              </div>
-                            ) : compOriginal ? (
-                              <p className="text-[10px] text-slate-400 mt-1.5">
-                                P/N: <strong className="text-slate-200">{compOriginal.partNumber || 'N/D'}</strong> • 
-                                S/N: <strong className="text-slate-200">{compOriginal.serialNumber || 'N/D'}</strong>
-                                {compOriginal.oficinaExecutante && (
-                                  <> • Oficina: <strong className="text-emerald-400">{compOriginal.oficinaExecutante}</strong></>
-                                )}
-                              </p>
-                            ) : null}
+                    return (
+                      <div key={sec.key} className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+                          <div className="flex items-center gap-2.5">
+                            <span className={`h-2.5 w-2.5 rounded-full ${sec.dotClass}`} />
+                            <h4 className="font-display font-bold text-sm text-white uppercase tracking-wider">
+                              {sec.title}
+                            </h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec.badgeClass}`}>
+                              {groupAlertas.length} {groupAlertas.length === 1 ? 'item' : 'itens'}
+                            </span>
                           </div>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Horas atuais ({sec.title}): <strong className="text-slate-200">{sec.hours.toFixed(1)} hs</strong>
+                          </span>
                         </div>
 
-                        {/* Dados de referência */}
-                        <div className="grid grid-cols-2 gap-4 text-xs bg-slate-900/50 p-3.5 rounded-xl border border-slate-750/30">
-                          <div>
-                            <span className="text-slate-405 text-[10px] block font-semibold mb-1">
-                              {isInspecao ? 'Última Inspeção Realizada' : 'Última Revisão Realizada'}
-                            </span>
-                            <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                              {formatDataBR(al.dataUltima)}
-                            </span>
-                            {isInspecao && inspOriginal ? (
-                              <div className="text-[10px] text-slate-505 italic mt-0.5 space-y-0.5 font-mono">
-                                <div>Célula: {(inspOriginal.horasCelulaNaInspecao || 0).toFixed(1)} hs</div>
-                                {inspOriginal.sistema === 'motor' && (
-                                  <div className="text-emerald-400">Motor: {(inspOriginal.horasMotorNaInspecao || 0).toFixed(1)} hs</div>
-                                )}
+                        <div className="grid grid-cols-1 gap-5">
+                          {groupAlertas.map((al) => {
+                            const isInspecao = al.tipoItem === 'inspecao';
+                            const compOriginal = !isInspecao ? componentes.find(c => c.id === al.idComponente) : undefined;
+                            const inspOriginal = isInspecao ? inspecoes.find(i => i.id === al.idComponente) : undefined;
+                            if (!compOriginal && !inspOriginal) return null;
+
+                            const sistema = isInspecao ? inspOriginal!.sistema : compOriginal!.sistema;
+                            const limiteHoras = isInspecao ? inspOriginal!.limiteHoras : compOriginal!.limiteHoras;
+                            const limiteDias = isInspecao ? inspOriginal!.limiteDias : compOriginal!.limiteDias;
+                            
+                            // Detalhes estéticos conforme nível de risco
+                            let cardBorderClass = 'border-slate-800 bg-slate-900/10';
+                            let bgAlertClass = 'bg-emerald-500/10 text-emerald-405 border border-emerald-500/20';
+                            let textAlertClass = 'text-emerald-450 font-mono font-semibold';
+                            let statusLabel = 'REGULAR';
+                            
+                            if (al.status === 'critico') {
+                              cardBorderClass = 'border-red-500/40 bg-red-950/10 relative shadow-sm shadow-red-500/5';
+                              bgAlertClass = 'bg-red-500/20 text-red-300 border border-red-500/30';
+                              textAlertClass = 'text-red-400 font-extrabold font-mono';
+                              statusLabel = '⚠️ CRÍTICO / VENCIDO';
+                            } else if (al.status === 'atencao') {
+                              cardBorderClass = 'border-amber-500/40 bg-amber-950/10 relative shadow-sm shadow-amber-500/5';
+                              bgAlertClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+                              textAlertClass = 'text-amber-300 font-bold font-mono';
+                              statusLabel = '⚡ ATENÇÃO / PRAZO PRÓXIMO';
+                            }
+
+                            return (
+                              <div
+                                key={`${al.tipoItem || 'comp'}-${al.idComponente}`}
+                                className={`border rounded-2xl p-5 ${cardBorderClass} flex flex-col md:flex-row justify-between gap-5 transition-all`}
+                                id={`alert-card-${al.idComponente}`}
+                              >
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex items-start justify-between md:justify-start gap-3">
+                                    <div>
+                                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${bgAlertClass}`}>
+                                          {statusLabel}
+                                        </span>
+                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                                          isInspecao
+                                            ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                                        }`}>
+                                          {isInspecao ? 'Inspeção Periódica' : 'Componente'}
+                                        </span>
+                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                                          sistema === 'motor'
+                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                            : sistema === 'helice'
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                            : 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                                        }`}>
+                                          {sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'}
+                                        </span>
+                                      </div>
+                                      <h4 className="font-display font-extrabold text-sm text-white tracking-tight leading-none">{al.nomeComponente}</h4>
+                                      {isInspecao && inspOriginal ? (
+                                        <div className="text-[10px] text-slate-400 mt-1.5 space-y-0.5">
+                                          {inspOriginal.oficinaExecutante && (
+                                            <p>Oficina: <strong className="text-emerald-400">{inspOriginal.oficinaExecutante}</strong></p>
+                                          )}
+                                          {inspOriginal.conteudo && (
+                                            <p className="text-slate-300 line-clamp-2">{inspOriginal.conteudo}</p>
+                                          )}
+                                          {inspOriginal.observacao && (
+                                            <p className="text-slate-400 italic line-clamp-1">Obs: {inspOriginal.observacao}</p>
+                                          )}
+                                        </div>
+                                      ) : compOriginal ? (
+                                        <p className="text-[10px] text-slate-400 mt-1.5">
+                                          P/N: <strong className="text-slate-200">{compOriginal.partNumber || 'N/D'}</strong> • 
+                                          S/N: <strong className="text-slate-200">{compOriginal.serialNumber || 'N/D'}</strong>
+                                          {compOriginal.oficinaExecutante && (
+                                            <> • Oficina: <strong className="text-emerald-400">{compOriginal.oficinaExecutante}</strong></>
+                                          )}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+
+                                  {/* Dados de referência */}
+                                  <div className="grid grid-cols-2 gap-4 text-xs bg-slate-900/50 p-3.5 rounded-xl border border-slate-750/30">
+                                    <div>
+                                      <span className="text-slate-405 text-[10px] block font-semibold mb-1">
+                                        {isInspecao ? 'Última Inspeção Realizada' : 'Última Revisão Realizada'}
+                                      </span>
+                                      <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                        {formatDataBR(al.dataUltima)}
+                                      </span>
+                                      {isInspecao && inspOriginal ? (
+                                        <div className="text-[10px] text-slate-505 italic mt-0.5 space-y-0.5 font-mono">
+                                          <div>Célula: {(inspOriginal.horasCelulaNaInspecao || 0).toFixed(1)} hs</div>
+                                          {inspOriginal.sistema === 'motor' && (
+                                            <div className="text-emerald-400">Motor: {(inspOriginal.horasMotorNaInspecao || 0).toFixed(1)} hs</div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-505 italic block mt-0.5">
+                                          Com {al.horasUltima.toFixed(1)} hs voo ({sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <span className="text-slate-405 text-[10px] block font-semibold mb-1">Vencimento Planejado</span>
+                                      {limiteDias > 0 && al.dataVencimento && (
+                                        <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
+                                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                          {formatDataBR(al.dataVencimento)}
+                                        </span>
+                                      )}
+                                      {limiteHoras > 0 && (
+                                        <div className="space-y-0.5 mt-1 font-mono">
+                                          {sistema === 'celula' && al.horasLimiteCelula !== undefined && (
+                                            <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                              <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                              Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                            </span>
+                                          )}
+                                          {sistema === 'motor' && (
+                                            <>
+                                              {al.horasLimiteCelula !== undefined && (
+                                                <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                                  Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                                </span>
+                                              )}
+                                              {al.horasLimiteMotor !== undefined && (
+                                                <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[11px] pl-5">
+                                                  Motor: {al.horasLimiteMotor.toFixed(1)} hs
+                                                </span>
+                                              )}
+                                            </>
+                                          )}
+                                          {sistema === 'helice' && (
+                                            <>
+                                              {al.horasLimiteCelula !== undefined && (
+                                                <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
+                                                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                                                  Célula: {al.horasLimiteCelula.toFixed(1)} hs
+                                                </span>
+                                              )}
+                                              {al.horasLimiteHelice !== undefined && (
+                                                <span className="font-semibold text-amber-400 flex items-center gap-1.5 text-[11px] pl-5">
+                                                  Hélice: {al.horasLimiteHelice.toFixed(1)} hs
+                                                </span>
+                                              )}
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Medidores de Margem */}
+                                <div className="w-full md:w-80 flex flex-col justify-center space-y-4 border-t pt-4 md:border-t-0 md:pt-0 border-slate-800/60">
+                                  
+                                  {/* Margem de Horas */}
+                                  {(al.metric === 'horas' || al.metric === 'ambas') && limiteHoras > 0 && (
+                                    <div className="space-y-2">
+                                      <div className="flex flex-col space-y-1">
+                                        <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Margem por Horas de Voo</span>
+                                        
+                                        {sistema === 'celula' && al.horasRestantesCelula !== undefined && (
+                                          <div className="flex justify-between text-xs font-semibold">
+                                            <span className="text-slate-350">Célula:</span>
+                                            <span className={textAlertClass}>
+                                              {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                            </span>
+                                          </div>
+                                        )}
+                                        
+                                        {sistema === 'motor' && (
+                                          <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
+                                            {al.horasRestantesCelula !== undefined && (
+                                              <div className="flex justify-between text-xs font-semibold">
+                                                <span className="text-slate-350">Célula:</span>
+                                                <span className={textAlertClass}>
+                                                  {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {al.horasRestantesMotor !== undefined && (
+                                              <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
+                                                <span className="text-emerald-400">Motor:</span>
+                                                <span className="text-emerald-400 font-mono font-bold">
+                                                  {al.horasRestantesMotor <= 0 ? 'Vencido!' : `${al.horasRestantesMotor.toFixed(1)} hs rest.`}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {sistema === 'helice' && (
+                                          <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
+                                            {al.horasRestantesCelula !== undefined && (
+                                              <div className="flex justify-between text-xs font-semibold">
+                                                <span className="text-slate-350">Célula:</span>
+                                                <span className={textAlertClass}>
+                                                  {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
+                                                </span>
+                                              </div>
+                                            )}
+                                            {al.horasRestantesHelice !== undefined && (
+                                              <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
+                                                <span className="text-amber-400">Hélice:</span>
+                                                <span className="text-amber-400 font-mono font-bold">
+                                                  {al.horasRestantesHelice <= 0 ? 'Vencido!' : `${al.horasRestantesHelice.toFixed(1)} hs rest.`}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Barra de Progresso */}
+                                      <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
+                                        <div
+                                          className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                          style={{ width: `${Math.max(0, Math.min(100, (al.horasRestantes / limiteHoras) * 100))}%` }}
+                                        ></div>
+                                      </div>
+                                      <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
+                                        <span>
+                                          {isInspecao && inspOriginal
+                                            ? `Realizada: ${inspOriginal.sistema === 'motor' ? inspOriginal.horasMotorNaInspecao || 0 : inspOriginal.horasCelulaNaInspecao || 0} hs (${inspOriginal.sistema === 'motor' ? 'Motor' : 'Célula'})`
+                                            : `Instalado: ${compOriginal?.horasInstalacao || 0} hs (${sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})`}
+                                        </span>
+                                        <span>Intervalo: {limiteHoras} hs</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Margem de Dias */}
+                                  {(al.metric === 'dias' || al.metric === 'ambas') && limiteDias > 0 && (
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between text-xs font-semibold">
+                                        <span className="text-slate-400 text-[10px] uppercase font-bold">Margem Calendária (Dias)</span>
+                                        <span className={textAlertClass}>
+                                          {al.diasRestantes <= 0 ? 'Vencido!' : `${al.diasRestantes} dias restantes`}
+                                        </span>
+                                      </div>
+                                      
+                                      {/* Barra de Progresso */}
+                                      <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
+                                        <div
+                                          className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                                          style={{ width: `${Math.max(0, Math.min(100, (al.diasRestantes / limiteDias) * 100))}%` }}
+                                        ></div>
+                                      </div>
+                                      <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
+                                        <span>Prazo: {limiteDias} dias</span>
+                                        <span>Vencimento: {formatDataBR(al.dataVencimento)}</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Botão Ação Rápida */}
+                                  <div className="pt-2 text-right">
+                                    {isInspecao && inspOriginal ? (
+                                      <button
+                                        onClick={() => {
+                                          handleEditInspecao(inspOriginal);
+                                          setActiveTab('inspecoes');
+                                        }}
+                                        className="inline-flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold py-1.5 px-3 rounded-xl border border-indigo-500/25 transition-all cursor-pointer"
+                                      >
+                                        <ClipboardCheck className="w-3.5 h-3.5" />
+                                        {userRole === 'oficina' ? 'Visualizar Inspeção' : 'Abrir / Atualizar Inspeção'}
+                                      </button>
+                                    ) : compOriginal ? (
+                                      <button
+                                        onClick={() => openRevisaoForComponente(compOriginal)}
+                                        className="inline-flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-bold py-1.5 px-3 rounded-xl border border-sky-500/25 transition-all cursor-pointer"
+                                      >
+                                        <Wrench className="w-3.5 h-3.5" />
+                                        Iniciar Revisão / Laudo
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-[10px] text-slate-505 italic block mt-0.5">
-                                Com {al.horasUltima.toFixed(1)} hs voo ({sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-slate-405 text-[10px] block font-semibold mb-1">Vencimento Planejado</span>
-                            {limiteDias > 0 && al.dataVencimento && (
-                              <span className="font-semibold text-slate-200 mt-0.5 flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                                {formatDataBR(al.dataVencimento)}
-                              </span>
-                            )}
-                            {limiteHoras > 0 && (
-                              <div className="space-y-0.5 mt-1 font-mono">
-                                {sistema === 'celula' && al.horasLimiteCelula !== undefined && (
-                                  <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
-                                    <Clock className="w-3.5 h-3.5 text-slate-500" />
-                                    Célula: {al.horasLimiteCelula.toFixed(1)} hs
-                                  </span>
-                                )}
-                                {sistema === 'motor' && (
-                                  <>
-                                    {al.horasLimiteCelula !== undefined && (
-                                      <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
-                                        <Clock className="w-3.5 h-3.5 text-slate-500" />
-                                        Célula: {al.horasLimiteCelula.toFixed(1)} hs
-                                      </span>
-                                    )}
-                                    {al.horasLimiteMotor !== undefined && (
-                                      <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[11px] pl-5">
-                                        Motor: {al.horasLimiteMotor.toFixed(1)} hs
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                                {sistema === 'helice' && (
-                                  <>
-                                    {al.horasLimiteCelula !== undefined && (
-                                      <span className="font-semibold text-slate-200 flex items-center gap-1.5 text-xs">
-                                        <Clock className="w-3.5 h-3.5 text-slate-500" />
-                                        Célula: {al.horasLimiteCelula.toFixed(1)} hs
-                                      </span>
-                                    )}
-                                    {al.horasLimiteHelice !== undefined && (
-                                      <span className="font-semibold text-amber-400 flex items-center gap-1.5 text-[11px] pl-5">
-                                        Hélice: {al.horasLimiteHelice.toFixed(1)} hs
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                            );
+                          })}
                         </div>
                       </div>
-
-                      {/* Medidores de Margem */}
-                      <div className="w-full md:w-80 flex flex-col justify-center space-y-4 border-t pt-4 md:border-t-0 md:pt-0 border-slate-800/60">
-                        
-                        {/* Margem de Horas */}
-                        {(al.metric === 'horas' || al.metric === 'ambas') && limiteHoras > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex flex-col space-y-1">
-                              <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wide">Margem por Horas de Voo</span>
-                              
-                              {sistema === 'celula' && al.horasRestantesCelula !== undefined && (
-                                <div className="flex justify-between text-xs font-semibold">
-                                  <span className="text-slate-350">Célula:</span>
-                                  <span className={textAlertClass}>
-                                    {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              {sistema === 'motor' && (
-                                <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
-                                  {al.horasRestantesCelula !== undefined && (
-                                    <div className="flex justify-between text-xs font-semibold">
-                                      <span className="text-slate-350">Célula:</span>
-                                      <span className={textAlertClass}>
-                                        {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {al.horasRestantesMotor !== undefined && (
-                                    <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
-                                      <span className="text-emerald-400">Motor:</span>
-                                      <span className="text-emerald-400 font-mono font-bold">
-                                        {al.horasRestantesMotor <= 0 ? 'Vencido!' : `${al.horasRestantesMotor.toFixed(1)} hs rest.`}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {sistema === 'helice' && (
-                                <div className="space-y-1.5 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/50">
-                                  {al.horasRestantesCelula !== undefined && (
-                                    <div className="flex justify-between text-xs font-semibold">
-                                      <span className="text-slate-350">Célula:</span>
-                                      <span className={textAlertClass}>
-                                        {al.horasRestantesCelula <= 0 ? 'Vencido!' : `${al.horasRestantesCelula.toFixed(1)} hs rest.`}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {al.horasRestantesHelice !== undefined && (
-                                    <div className="flex justify-between text-xs font-semibold border-t border-slate-900 pt-1.5">
-                                      <span className="text-amber-400">Hélice:</span>
-                                      <span className="text-amber-400 font-mono font-bold">
-                                        {al.horasRestantesHelice <= 0 ? 'Vencido!' : `${al.horasRestantesHelice.toFixed(1)} hs rest.`}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Barra de Progresso */}
-                            <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
-                              <div
-                                className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.max(0, Math.min(100, (al.horasRestantes / limiteHoras) * 100))}%` }}
-                              ></div>
-                            </div>
-                            <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
-                              <span>
-                                {isInspecao && inspOriginal
-                                  ? `Realizada: ${inspOriginal.sistema === 'motor' ? inspOriginal.horasMotorNaInspecao || 0 : inspOriginal.horasCelulaNaInspecao || 0} hs (${inspOriginal.sistema === 'motor' ? 'Motor' : 'Célula'})`
-                                  : `Instalado: ${compOriginal?.horasInstalacao || 0} hs (${sistema === 'celula' ? 'Célula' : sistema === 'motor' ? 'Motor' : 'Hélice'})`}
-                              </span>
-                              <span>Intervalo: {limiteHoras} hs</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Margem de Dias */}
-                        {(al.metric === 'dias' || al.metric === 'ambas') && limiteDias > 0 && (
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span className="text-slate-400 text-[10px] uppercase font-bold">Margem Calendária (Dias)</span>
-                              <span className={textAlertClass}>
-                                {al.diasRestantes <= 0 ? 'Vencido!' : `${al.diasRestantes} dias restantes`}
-                              </span>
-                            </div>
-                            
-                            {/* Barra de Progresso */}
-                            <div className="w-full bg-slate-950/80 rounded-full h-2 overflow-hidden border border-slate-800/80">
-                              <div
-                                className={`h-full rounded-full ${al.status === 'critico' ? 'bg-red-500' : al.status === 'atencao' ? 'bg-amber-400' : 'bg-emerald-500'}`}
-                                style={{ width: `${Math.max(0, Math.min(100, (al.diasRestantes / limiteDias) * 100))}%` }}
-                              ></div>
-                            </div>
-                            <div className="flex justify-between text-[9px] text-slate-500 font-medium font-mono">
-                              <span>Prazo: {limiteDias} dias</span>
-                              <span>Vencimento: {formatDataBR(al.dataVencimento)}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Botão Ação Rápida */}
-                        <div className="pt-2 text-right">
-                          {isInspecao && inspOriginal ? (
-                            <button
-                              onClick={() => {
-                                handleEditInspecao(inspOriginal);
-                                setActiveTab('inspecoes');
-                              }}
-                              className="inline-flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold py-1.5 px-3 rounded-xl border border-indigo-500/25 transition-all cursor-pointer"
-                            >
-                              <ClipboardCheck className="w-3.5 h-3.5" />
-                              {userRole === 'oficina' ? 'Visualizar Inspeção' : 'Abrir / Atualizar Inspeção'}
-                            </button>
-                          ) : compOriginal ? (
-                            <button
-                              onClick={() => openRevisaoForComponente(compOriginal)}
-                              className="inline-flex items-center gap-1 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs font-bold py-1.5 px-3 rounded-xl border border-sky-500/25 transition-all cursor-pointer"
-                            >
-                              <Wrench className="w-3.5 h-3.5" />
-                              Iniciar Revisão / Laudo
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -1587,7 +1703,7 @@ export default function AeronaveDetail({
             );
           })() : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-display font-bold text-white tracking-tight">Componentes e Peças Controladas</h3>
                   <p className="text-xs text-slate-400">Cadastre as peças que possuem desgaste por horas de voo ou tempo limite.</p>
@@ -1595,7 +1711,7 @@ export default function AeronaveDetail({
                 {userRole !== 'oficina' && (
                   <button
                     onClick={openNovoComponente}
-                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10 w-fit"
                   >
                     <Plus className="w-4 h-4" />
                     Cadastrar Componente
@@ -1603,152 +1719,242 @@ export default function AeronaveDetail({
                 )}
               </div>
 
+              {componentes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-slate-900/40 p-2 rounded-xl border border-slate-800/70 w-fit">
+                  {(
+                    [
+                      { id: 'todos', label: 'Todos', count: componentes.length, activeClass: 'bg-slate-700 text-white border-slate-500' },
+                      { id: 'celula', label: 'Célula', count: componentes.filter(c => (c.sistema || 'celula') === 'celula').length, activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+                      { id: 'motor', label: 'Motor', count: componentes.filter(c => c.sistema === 'motor').length, activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+                      { id: 'helice', label: 'Hélice', count: componentes.filter(c => c.sistema === 'helice').length, activeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setCompSistemaFilter(opt.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        compSistemaFilter === opt.id
+                          ? opt.activeClass
+                          : 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      <span className="text-[10px] font-mono opacity-80">({opt.count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {componentes.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
                   Nenhum componente mapeado nesta aeronave. Inicie o rastreamento clicando no botão acima!
                 </div>
-              ) : (
-                <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
-                        <th className="p-4">Componente</th>
-                        <th className="p-4">P/N e S/N</th>
-                        <th className="p-4">Limites Fixados</th>
-                        <th className="p-4">Instalação na Aeronave</th>
-                        <th className="p-4">Última Revisão Realizada</th>
-                        <th className="p-4 text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                      {componentes.map((c) => {
-                        const alerta = calcularAlerta(c, aeronave);
-                        return (
-                          <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
-                            <td className="p-4 font-semibold text-white">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
-                                  alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
-                                }`} title={`Status: ${alerta.status}`}></span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditComponente(c)}
-                                  className="text-left hover:text-sky-400 transition-colors cursor-pointer"
-                                  title="Abrir componente e anexos"
-                                >
-                                  {c.nome}
-                                </button>
-                                {c.condicao && (
-                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
-                                    c.condicao === 'novo'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                                  }`}>
-                                    {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
-                                  </span>
-                                )}
-                                {c.sistema && (
-                                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
-                                    c.sistema === 'motor'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : c.sistema === 'helice'
-                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                      : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                                  }`}>
-                                    {c.sistema === 'celula' ? 'Célula' : c.sistema === 'motor' ? 'Motor' : 'Hélice'}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="space-y-1">
-                                {c.marca && (
-                                  <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">
-                                    {c.marca}
-                                  </div>
-                                )}
-                                <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
-                                  <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
-                                  <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
-                                  {c.oficinaExecutante && (
-                                    <div className="text-[10px] text-emerald-400 font-sans mt-1">
-                                      Oficina: <strong className="font-semibold text-slate-200">{c.oficinaExecutante}</strong>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 font-semibold text-slate-200">
-                              <div className="space-y-0.5">
-                                {c.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {c.limiteHoras} hs voo</div>}
-                                {c.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {c.limiteDias} dias can.</div>}
-                                {c.limiteHoras === 0 && c.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="space-y-0.5 text-slate-300">
-                                <div>{formatDataBR(c.dataInstalacao)}</div>
-                                <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
-                                  <div>Célula: <strong className="text-slate-300">{c.horasInstalacao || 0} hs</strong></div>
-                                  {c.sistema === 'motor' && (
-                                    <div>Motor: <strong className="text-emerald-400">{c.horasInstalacaoMotor || 0} hs</strong></div>
-                                  )}
-                                  {c.sistema === 'helice' && (
-                                    <div>Hélice: <strong className="text-amber-400">{c.horasInstalacaoHelice || 0} hs</strong></div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="space-y-0.5 text-slate-300">
-                                <div>{formatDataBR(c.ultimaRevisaoData || c.dataInstalacao)}</div>
-                                <div className="text-slate-500 text-[10px] font-mono">Aos {c.horasInstalacao} hs voo</div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => openRevisaoForComponente(c)}
-                                  className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                  title="Anexar Revisão"
-                                >
-                                  <Upload className="w-3.5 h-3.5" />
-                                </button>
-                                {userRole === 'oficina' ? (
-                                  <button
-                                    onClick={() => handleEditComponente(c)}
-                                    className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                    title="Visualizar Componente e Anexos"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditComponente(c)}
-                                      className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                      title="Editar"
-                                    >
-                                      <History className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteComponente(c.id)}
-                                      className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              ) : (() => {
+                const compGroups = (
+                  [
+                    {
+                      key: 'celula' as const,
+                      title: 'Célula',
+                      hours: aeronave.horasTotais,
+                      badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+                      dotClass: 'bg-sky-400',
+                    },
+                    {
+                      key: 'motor' as const,
+                      title: 'Motor',
+                      hours: aeronave.horasMotor || 0,
+                      badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                      dotClass: 'bg-emerald-400',
+                    },
+                    {
+                      key: 'helice' as const,
+                      title: 'Hélice',
+                      hours: aeronave.horasHelice || 0,
+                      badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                      dotClass: 'bg-amber-400',
+                    },
+                  ]
+                )
+                  .filter((sec) => compSistemaFilter === 'todos' || compSistemaFilter === sec.key)
+                  .map((sec) => ({
+                    ...sec,
+                    items: componentes.filter((c) => (c.sistema || 'celula') === sec.key),
+                  }))
+                  .filter((sec) => sec.items.length > 0);
+
+                if (compGroups.length === 0) {
+                  return (
+                    <div className="text-center py-12 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-6 text-slate-400 text-xs font-mono">
+                      Nenhum componente cadastrado para o sistema selecionado.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-8">
+                    {compGroups.map((sec) => (
+                      <div key={sec.key} className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                          <div className="flex items-center gap-2.5">
+                            <span className={`h-2.5 w-2.5 rounded-full ${sec.dotClass}`} />
+                            <h4 className="font-display font-bold text-sm text-white uppercase tracking-wider">
+                              {sec.title}
+                            </h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec.badgeClass}`}>
+                              {sec.items.length} {sec.items.length === 1 ? 'componente' : 'componentes'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Horas atuais ({sec.title}): <strong className="text-slate-200">{sec.hours.toFixed(1)} hs</strong>
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
+                                <th className="p-4">Componente</th>
+                                <th className="p-4">P/N e S/N</th>
+                                <th className="p-4">Limites Fixados</th>
+                                <th className="p-4">Instalação na Aeronave</th>
+                                <th className="p-4">Última Revisão Realizada</th>
+                                <th className="p-4 text-right">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                              {sec.items.map((c) => {
+                                const alerta = calcularAlerta(c, aeronave);
+                                return (
+                                  <tr key={c.id} className="hover:bg-slate-850/40 transition-colors" id={`comp-row-${c.id}`}>
+                                    <td className="p-4 font-semibold text-white">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
+                                          alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                                        }`} title={`Status: ${alerta.status}`}></span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditComponente(c)}
+                                          className="text-left hover:text-sky-400 transition-colors cursor-pointer"
+                                          title="Abrir componente e anexos"
+                                        >
+                                          {c.nome}
+                                        </button>
+                                        {c.condicao && (
+                                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                            c.condicao === 'novo'
+                                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                              : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                                          }`}>
+                                            {c.condicao === 'novo' ? 'Novo' : 'Overhauled'}
+                                          </span>
+                                        )}
+                                        {c.sistema && (
+                                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                            c.sistema === 'motor'
+                                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                              : c.sistema === 'helice'
+                                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                              : 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                                          }`}>
+                                            {c.sistema === 'celula' ? 'Célula' : c.sistema === 'motor' ? 'Motor' : 'Hélice'}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="space-y-1">
+                                        {c.marca && (
+                                          <div className="text-[10px] font-bold text-sky-400 uppercase tracking-wider">
+                                            {c.marca}
+                                          </div>
+                                        )}
+                                        <div className="space-y-0.5 font-mono text-[11px] text-slate-400">
+                                          <div>P/N: <strong className="text-slate-200">{c.partNumber || '-'}</strong></div>
+                                          <div>S/N: <strong className="text-slate-200">{c.serialNumber || '-'}</strong></div>
+                                          {c.oficinaExecutante && (
+                                            <div className="text-[10px] text-emerald-400 font-sans mt-1">
+                                              Oficina: <strong className="font-semibold text-slate-200">{c.oficinaExecutante}</strong>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 font-semibold text-slate-200">
+                                      <div className="space-y-0.5">
+                                        {c.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {c.limiteHoras} hs voo</div>}
+                                        {c.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {c.limiteDias} dias can.</div>}
+                                        {c.limiteHoras === 0 && c.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="space-y-0.5 text-slate-300">
+                                        <div>{formatDataBR(c.dataInstalacao)}</div>
+                                        <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
+                                          <div>Célula: <strong className="text-slate-300">{c.horasInstalacao || 0} hs</strong></div>
+                                          {c.sistema === 'motor' && (
+                                            <div>Motor: <strong className="text-emerald-400">{c.horasInstalacaoMotor || 0} hs</strong></div>
+                                          )}
+                                          {c.sistema === 'helice' && (
+                                            <div>Hélice: <strong className="text-amber-400">{c.horasInstalacaoHelice || 0} hs</strong></div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="space-y-0.5 text-slate-300">
+                                        <div>{formatDataBR(c.ultimaRevisaoData || c.dataInstalacao)}</div>
+                                        <div className="text-slate-500 text-[10px] font-mono">Aos {c.horasInstalacao} hs voo</div>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <button
+                                          onClick={() => openRevisaoForComponente(c)}
+                                          className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                          title="Anexar Revisão"
+                                        >
+                                          <Upload className="w-3.5 h-3.5" />
+                                        </button>
+                                        {userRole === 'oficina' ? (
+                                          <button
+                                            onClick={() => handleEditComponente(c)}
+                                            className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                            title="Visualizar Componente e Anexos"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                          </button>
+                                        ) : (
+                                          <>
+                                            <button
+                                              onClick={() => handleEditComponente(c)}
+                                              className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                              title="Editar"
+                                            >
+                                              <History className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteComponente(c.id)}
+                                              className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                              title="Excluir"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )
         )}
@@ -1968,7 +2174,7 @@ export default function AeronaveDetail({
             );
           })() : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-display font-bold text-white tracking-tight">Inspeções Periódicas</h3>
                   <p className="text-xs text-slate-400">Cadastre as inspeções periódicas de célula e motor para controle automático no mapa de alertas.</p>
@@ -1976,7 +2182,7 @@ export default function AeronaveDetail({
                 {userRole !== 'oficina' && (
                   <button
                     onClick={openNovaInspecao}
-                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10"
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10 w-fit"
                   >
                     <Plus className="w-4 h-4" />
                     Cadastrar Inspeção
@@ -1984,117 +2190,199 @@ export default function AeronaveDetail({
                 )}
               </div>
 
+              {inspecoes.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-slate-900/40 p-2 rounded-xl border border-slate-800/70 w-fit">
+                  {(
+                    [
+                      { id: 'todos', label: 'Todos', count: inspecoes.length, activeClass: 'bg-slate-700 text-white border-slate-500' },
+                      { id: 'celula', label: 'Célula', count: inspecoes.filter(i => (i.sistema || 'celula') === 'celula').length, activeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40' },
+                      { id: 'motor', label: 'Motor', count: inspecoes.filter(i => i.sistema === 'motor').length, activeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setInspSistemaFilter(opt.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                        inspSistemaFilter === opt.id
+                          ? opt.activeClass
+                          : 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      <span className="text-[10px] font-mono opacity-80">({opt.count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {inspecoes.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono">
                   Nenhuma inspeção periódica cadastrada nesta aeronave. Clique no botão acima para adicionar!
                 </div>
-              ) : (
-                <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
-                        <th className="p-4">Inspeção</th>
-                        <th className="p-4">Conteúdo / Observação</th>
-                        <th className="p-4">Limites Fixados</th>
-                        <th className="p-4">Última Realização</th>
-                        <th className="p-4 text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                      {inspecoes.map((insp) => {
-                        const alerta = calcularAlertaInspecao(insp, aeronave);
-                        return (
-                          <tr key={insp.id} className="hover:bg-slate-850/40 transition-colors" id={`insp-row-${insp.id}`}>
-                            <td className="p-4 font-semibold text-white">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
-                                  alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
-                                }`} title={`Status: ${alerta.status}`}></span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditInspecao(insp)}
-                                  className="text-left hover:text-sky-400 transition-colors cursor-pointer"
-                                  title="Abrir detalhes da inspeção"
-                                >
-                                  {insp.nome}
-                                </button>
-                                <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
-                                  insp.sistema === 'motor'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                    : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                                }`}>
-                                  {insp.sistema === 'motor' ? 'Motor' : 'Célula'}
-                                </span>
-                              </div>
-                              {insp.oficinaExecutante && (
-                                <div className="text-[10px] text-emerald-400 font-normal mt-1 pl-4">
-                                  Oficina: <strong className="font-semibold text-slate-200">{insp.oficinaExecutante}</strong>
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-4 max-w-xs">
-                              <div className="space-y-1">
-                                <p className="text-slate-200 line-clamp-2">{insp.conteudo || '-'}</p>
-                                {insp.observacao && (
-                                  <p className="text-[10px] text-slate-400 italic line-clamp-1">Obs: {insp.observacao}</p>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-4 font-semibold text-slate-200">
-                              <div className="space-y-0.5">
-                                {insp.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {insp.limiteHoras} hs voo</div>}
-                                {insp.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {insp.limiteDias} dias can.</div>}
-                                {insp.limiteHoras === 0 && insp.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
-                              </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="space-y-0.5 text-slate-300">
-                                <div>{formatDataBR(insp.dataRealizacao)}</div>
-                                <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
-                                  <div>Célula: <strong className="text-slate-300">{insp.horasCelulaNaInspecao || 0} hs</strong></div>
-                                  {insp.sistema === 'motor' && (
-                                    <div>Motor: <strong className="text-emerald-400">{insp.horasMotorNaInspecao || 0} hs</strong></div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {userRole === 'oficina' ? (
-                                  <button
-                                    onClick={() => handleEditInspecao(insp)}
-                                    className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                    title="Visualizar Inspeção"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditInspecao(insp)}
-                                      className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                      title="Editar"
-                                    >
-                                      <History className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteInspecao(insp.id)}
-                                      className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
-                                      title="Excluir"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              ) : (() => {
+                const inspGroups = (
+                  [
+                    {
+                      key: 'celula' as const,
+                      title: 'Célula',
+                      hours: aeronave.horasTotais,
+                      badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+                      dotClass: 'bg-sky-400',
+                    },
+                    {
+                      key: 'motor' as const,
+                      title: 'Motor',
+                      hours: aeronave.horasMotor || 0,
+                      badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                      dotClass: 'bg-emerald-400',
+                    },
+                  ]
+                )
+                  .filter((sec) => inspSistemaFilter === 'todos' || inspSistemaFilter === sec.key)
+                  .map((sec) => ({
+                    ...sec,
+                    items: inspecoes.filter((i) => (i.sistema || 'celula') === sec.key),
+                  }))
+                  .filter((sec) => sec.items.length > 0);
+
+                if (inspGroups.length === 0) {
+                  return (
+                    <div className="text-center py-12 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-6 text-slate-400 text-xs font-mono">
+                      Nenhuma inspeção periódica cadastrada para o sistema selecionado.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-8">
+                    {inspGroups.map((sec) => (
+                      <div key={sec.key} className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                          <div className="flex items-center gap-2.5">
+                            <span className={`h-2.5 w-2.5 rounded-full ${sec.dotClass}`} />
+                            <h4 className="font-display font-bold text-sm text-white uppercase tracking-wider">
+                              {sec.title}
+                            </h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec.badgeClass}`}>
+                              {sec.items.length} {sec.items.length === 1 ? 'inspeção' : 'inspeções'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Horas atuais ({sec.title}): <strong className="text-slate-200">{sec.hours.toFixed(1)} hs</strong>
+                          </span>
+                        </div>
+
+                        <div className="overflow-x-auto border border-slate-700/50 rounded-2xl bg-slate-900/30">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-800/45 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-705/35">
+                                <th className="p-4">Inspeção</th>
+                                <th className="p-4">Conteúdo / Observação</th>
+                                <th className="p-4">Limites Fixados</th>
+                                <th className="p-4">Última Realização</th>
+                                <th className="p-4 text-right">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                              {sec.items.map((insp) => {
+                                const alerta = calcularAlertaInspecao(insp, aeronave);
+                                return (
+                                  <tr key={insp.id} className="hover:bg-slate-850/40 transition-colors" id={`insp-row-${insp.id}`}>
+                                    <td className="p-4 font-semibold text-white">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 animate-pulse ${
+                                          alerta.status === 'critico' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' : alerta.status === 'atencao' ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+                                        }`} title={`Status: ${alerta.status}`}></span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditInspecao(insp)}
+                                          className="text-left hover:text-sky-400 transition-colors cursor-pointer"
+                                          title="Abrir detalhes da inspeção"
+                                        >
+                                          {insp.nome}
+                                        </button>
+                                        <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-widest ${
+                                          insp.sistema === 'motor'
+                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                        }`}>
+                                          {insp.sistema === 'motor' ? 'Motor' : 'Célula'}
+                                        </span>
+                                      </div>
+                                      {insp.oficinaExecutante && (
+                                        <div className="text-[10px] text-emerald-400 font-normal mt-1 pl-4">
+                                          Oficina: <strong className="font-semibold text-slate-200">{insp.oficinaExecutante}</strong>
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4 max-w-xs">
+                                      <div className="space-y-1">
+                                        <p className="text-slate-200 line-clamp-2">{insp.conteudo || '-'}</p>
+                                        {insp.observacao && (
+                                          <p className="text-[10px] text-slate-400 italic line-clamp-1">Obs: {insp.observacao}</p>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="p-4 font-semibold text-slate-200">
+                                      <div className="space-y-0.5">
+                                        {insp.limiteHoras > 0 && <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-sky-400" /> {insp.limiteHoras} hs voo</div>}
+                                        {insp.limiteDias > 0 && <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-sky-400" /> {insp.limiteDias} dias can.</div>}
+                                        {insp.limiteHoras === 0 && insp.limiteDias === 0 && <span className="text-slate-500 italic font-medium">Livre / Não param.</span>}
+                                      </div>
+                                    </td>
+                                    <td className="p-4">
+                                      <div className="space-y-0.5 text-slate-300">
+                                        <div>{formatDataBR(insp.dataRealizacao)}</div>
+                                        <div className="space-y-0.5 text-[10px] font-mono text-slate-500">
+                                          <div>Célula: <strong className="text-slate-300">{insp.horasCelulaNaInspecao || 0} hs</strong></div>
+                                          {insp.sistema === 'motor' && (
+                                            <div>Motor: <strong className="text-emerald-400">{insp.horasMotorNaInspecao || 0} hs</strong></div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      <div className="flex items-center justify-end gap-1">
+                                        {userRole === 'oficina' ? (
+                                          <button
+                                            onClick={() => handleEditInspecao(insp)}
+                                            className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                            title="Visualizar Inspeção"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                          </button>
+                                        ) : (
+                                          <>
+                                            <button
+                                              onClick={() => handleEditInspecao(insp)}
+                                              className="p-1.5 text-slate-400 hover:text-sky-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                              title="Editar"
+                                            >
+                                              <History className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteInspecao(insp.id)}
+                                              className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                                              title="Excluir"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )
         )}
@@ -2443,7 +2731,7 @@ export default function AeronaveDetail({
                           </td>
                           <td className="p-4 text-slate-400 font-medium italic max-w-xs">{v.descricao || '-'}</td>
                           <td className="p-4 text-right">
-                            {userRole !== 'oficina' && (
+                            {userRole !== 'oficina' && (!isPilotOnly || v.pendingSync) && (
                               <button
                                 onClick={() => void handleDeleteVoo(v.id, v.pendingSync)}
                                 className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"

@@ -8,6 +8,7 @@ import { Cliente, Aeronave } from './types';
 import ClientesList from './components/ClientesList';
 import AeronavesList from './components/AeronavesList';
 import AeronaveDetail from './components/AeronaveDetail';
+import { PilotosModal } from './components/PilotosModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import {
@@ -32,6 +33,7 @@ import {
   Lock,
   LogOut,
   User,
+  Compass,
 } from 'lucide-react';
 
 export default function App() {
@@ -41,13 +43,18 @@ export default function App() {
   const [selectedAeronave, setSelectedAeronave] = useState<Aeronave | null>(null);
   
   // Controle de Autenticação
-  const [userRole, setUserRole] = useState<'admin' | 'cliente' | 'oficina' | null>(() => {
-    return (localStorage.getItem('aeromanut_userRole') as 'admin' | 'cliente' | 'oficina' | null) || null;
+  const [userRole, setUserRole] = useState<'admin' | 'cliente' | 'oficina' | 'piloto' | null>(() => {
+    return (localStorage.getItem('aeromanut_userRole') as 'admin' | 'cliente' | 'oficina' | 'piloto' | null) || null;
   });
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('aeromanut_currentUser');
     return saved ? JSON.parse(saved) : null;
   });
+  const [pilotoUser, setPilotoUser] = useState<{ id: string; nome: string; email: string; canac?: string } | null>(() => {
+    const saved = localStorage.getItem('aeromanut_pilotoUser');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [showClientPilotosModal, setShowClientPilotosModal] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -73,7 +80,7 @@ export default function App() {
 
   // Efeito para garantir que o cliente logado esteja sempre pré-selecionado
   useEffect(() => {
-    if ((userRole === 'cliente' || userRole === 'oficina') && currentUser) {
+    if ((userRole === 'cliente' || userRole === 'oficina' || userRole === 'piloto') && currentUser) {
       setSelectedCliente(currentUser);
     }
   }, [userRole, currentUser]);
@@ -81,7 +88,7 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail.trim() || !loginPassword.trim()) {
-      setLoginError('Por favor, digite seu e-mail e senha.');
+      setLoginError('Por favor, digite seu e-mail ou código ANAC e senha.');
       return;
     }
     setIsLoggingIn(true);
@@ -99,8 +106,16 @@ export default function App() {
         setCurrentUser(data.user);
         localStorage.setItem('aeromanut_userRole', data.role);
         localStorage.setItem('aeromanut_currentUser', JSON.stringify(data.user));
+
+        if (data.role === 'piloto' && data.pilotoUser) {
+          setPilotoUser(data.pilotoUser);
+          localStorage.setItem('aeromanut_pilotoUser', JSON.stringify(data.pilotoUser));
+        } else {
+          setPilotoUser(null);
+          localStorage.removeItem('aeromanut_pilotoUser');
+        }
         
-        if (data.role === 'cliente' || data.role === 'oficina') {
+        if (data.role === 'cliente' || data.role === 'oficina' || data.role === 'piloto') {
           setSelectedCliente(data.user);
         } else {
           setSelectedCliente(null);
@@ -119,10 +134,13 @@ export default function App() {
   const handleLogout = () => {
     setUserRole(null);
     setCurrentUser(null);
+    setPilotoUser(null);
     setSelectedCliente(null);
     setSelectedAeronave(null);
+    setShowClientPilotosModal(false);
     localStorage.removeItem('aeromanut_userRole');
     localStorage.removeItem('aeromanut_currentUser');
+    localStorage.removeItem('aeromanut_pilotoUser');
     setLoginEmail('');
     setLoginPassword('');
     setLoginError(null);
@@ -184,12 +202,23 @@ export default function App() {
     return effectiveAeronaves.find((a) => a.id === selectedAeronave.id) || selectedAeronave;
   }, [selectedAeronave, effectiveAeronaves]);
 
+  const clientAeronaves = useMemo(() => {
+    if (!selectedCliente) return [];
+    return effectiveAeronaves.filter((a) => a.clienteId === selectedCliente.id);
+  }, [effectiveAeronaves, selectedCliente]);
+
+  useEffect(() => {
+    if (userRole === 'piloto' && selectedCliente && !selectedAeronave && clientAeronaves.length === 1) {
+      setSelectedAeronave(clientAeronaves[0]);
+    }
+  }, [userRole, selectedCliente, selectedAeronave, clientAeronaves]);
+
   const prefetchAeronavesOffline = useCallback(async (aeroList: Aeronave[]) => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     const cachedRole = localStorage.getItem('aeromanut_userRole');
     const cachedUserRaw = localStorage.getItem('aeromanut_currentUser');
     let targetList = aeroList;
-    if ((cachedRole === 'cliente' || cachedRole === 'oficina') && cachedUserRaw) {
+    if ((cachedRole === 'cliente' || cachedRole === 'oficina' || cachedRole === 'piloto') && cachedUserRaw) {
       try {
         const uObj = JSON.parse(cachedUserRaw);
         targetList = aeroList.filter((a) => a.clienteId === uObj.id);
@@ -316,10 +345,10 @@ export default function App() {
       void saveAeronavesCache(aeroList);
       void prefetchAeronavesOffline(aeroList);
 
-      // Se for cliente ou oficina, sincroniza as informações atualizadas do próprio perfil do banco de dados
+      // Se for cliente, oficina ou piloto, sincroniza as informações atualizadas do próprio perfil do banco de dados
       const cachedRole = localStorage.getItem('aeromanut_userRole');
       const cachedUser = localStorage.getItem('aeromanut_currentUser');
-      if ((cachedRole === 'cliente' || cachedRole === 'oficina') && cachedUser) {
+      if ((cachedRole === 'cliente' || cachedRole === 'oficina' || cachedRole === 'piloto') && cachedUser) {
         const uObj = JSON.parse(cachedUser);
         const latestInfo = clientList.find((c: any) => c.id === uObj.id);
         if (latestInfo) {
@@ -506,15 +535,16 @@ export default function App() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">E-mail (Login)</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">E-mail ou Código ANAC (Login)</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
-                    type="email"
+                    type="text"
                     required
+                    autoComplete="username"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="Ex: seuemail@provedor.com"
+                    placeholder="Ex: seuemail@provedor.com ou CANAC (6 dígitos)"
                     className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-600"
                     disabled={isLoggingIn}
                   />
@@ -830,15 +860,31 @@ export default function App() {
               </div>
               <div className="text-left">
                 <div className="text-[11px] font-bold text-slate-200">
-                  {currentUser?.nome || 'Usuário'}
+                  {userRole === 'piloto' && pilotoUser?.nome ? pilotoUser.nome : (currentUser?.nome || 'Usuário')}
                 </div>
                 <div className="text-[9px] text-blue-400 font-semibold tracking-wider uppercase font-mono">
-                  {userRole === 'admin' ? 'Administrador' : userRole === 'oficina' ? 'Acesso Oficina / Doc' : 'Acesso Cliente'}
+                  {userRole === 'admin'
+                    ? 'Administrador'
+                    : userRole === 'oficina'
+                    ? 'Acesso Oficina / Doc'
+                    : userRole === 'piloto'
+                    ? 'Piloto • Diário de Bordo'
+                    : 'Acesso Cliente'}
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {userRole === 'cliente' && selectedCliente && (
+                <button
+                  onClick={() => setShowClientPilotosModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-[11px] font-semibold text-sky-400 transition-all cursor-pointer"
+                  title="Cadastrar Pilotos para acesso exclusivo ao Diário de Bordo"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Pilotos</span>
+                </button>
+              )}
               <PWAInstallButton />
               <button
                 onClick={handleLogout}
@@ -860,19 +906,22 @@ export default function App() {
         {effectiveSelectedAeronave ? (
           /* WORKSPACE INDIVIDUAL DE UMA AERONAVE COM MAPA DE COMPONENTES, HISTÓRICO, LAUDOS E UPLOADS */
           <div className="space-y-4 animate-fade-in">
-            <button
-              onClick={() => setSelectedAeronave(null)}
-              className="inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-blue-400 bg-slate-900/50 border border-slate-800/50 px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md hover:border-slate-700/50"
-              id="btn-voltar-frota"
-            >
-              <ArrowLeft className="w-4 h-4 text-blue-400" />
-              Voltar para a Frota de Aeronaves
-            </button>
+            {!(userRole === 'piloto' && clientAeronaves.length <= 1) && (
+              <button
+                onClick={() => setSelectedAeronave(null)}
+                className="inline-flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-blue-400 bg-slate-900/50 border border-slate-800/50 px-4 py-2.5 rounded-xl cursor-pointer transition-all shadow-md hover:border-slate-700/50"
+                id="btn-voltar-frota"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-400" />
+                {userRole === 'piloto' ? 'Trocar Aeronave' : 'Voltar para a Frota de Aeronaves'}
+              </button>
+            )}
             <AeronaveDetail
               aeronave={effectiveSelectedAeronave}
               cliente={selectedCliente!}
               onRefreshAeronave={handleRefreshAeronave}
               userRole={userRole}
+              pilotoUser={pilotoUser}
             />
           </div>
         ) : (
@@ -880,19 +929,21 @@ export default function App() {
           <div className="space-y-6">
             
             {/* Informações Auxiliares */}
-            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-4 text-xs shadow-lg">
-              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl flex-shrink-0 border border-blue-500/15">
-                <Info className="w-5 h-5" />
+            {userRole !== 'piloto' && (
+              <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start gap-4 text-xs shadow-lg">
+                <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl flex-shrink-0 border border-blue-500/15">
+                  <Info className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-display font-bold text-white text-sm">Como funciona o controle de manutenção por horas de voo?</h4>
+                  <p className="text-slate-300 leading-relaxed">
+                    Cadastre o cliente e suas respectivas aeronaves. Nas aeronaves, adicione componentes controlados (instalação e limites de horas/dias). 
+                    Toda vez que um voo for adicionado no <strong className="text-blue-400 font-semibold">Diário de Bordo</strong> da aeronave, seu tempo total é atualizado e o sistema recalcula 
+                    automaticamente o mapa de alertas e vencimentos de inspeção, sinalizando os gargalos de revisão com antecedência.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h4 className="font-display font-bold text-white text-sm">Como funciona o controle de manutenção por horas de voo?</h4>
-                <p className="text-slate-300 leading-relaxed">
-                  Cadastre o cliente e suas respectivas aeronaves. Nas aeronaves, adicione componentes controlados (instalação e limites de horas/dias). 
-                  Toda vez que um voo for adicionado no <strong className="text-blue-400 font-semibold">Diário de Bordo</strong> da aeronave, seu tempo total é atualizado e o sistema recalcula 
-                  automaticamente o mapa de alertas e vencimentos de inspeção, sinalizando os gargalos de revisão com antecedência.
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Grid Dividida de Clientes e Aeronaves */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
@@ -925,12 +976,20 @@ export default function App() {
                   onAddAeronave={handleAddAeronave}
                   onUpdateAeronave={handleUpdateAeronave}
                   onDeleteAeronave={handleDeleteAeronave}
+                  readOnlyPilot={userRole === 'piloto'}
                 />
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {showClientPilotosModal && selectedCliente && userRole === 'cliente' && (
+        <PilotosModal
+          cliente={selectedCliente}
+          onClose={() => setShowClientPilotosModal(false)}
+        />
+      )}
 
       {/* Rodapé do Sistema */}
       <footer className="bg-slate-950 border-t border-slate-900 mt-12 py-6 px-6 text-xs text-center text-slate-500" id="app-footer">

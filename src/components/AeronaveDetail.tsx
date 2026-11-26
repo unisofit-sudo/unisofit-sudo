@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, AnexoComponente } from '../types';
+import { Aeronave, Cliente, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, AnexoComponente, Caderneta } from '../types';
 import { calcularAlerta, calcularTodosAlertas, calcularAlertaInspecao, calcularTodosAlertasInspecoes, formatDataBR, obterDataHojeISO } from '../utils';
 import {
   getAeronaveDetailCache,
@@ -37,7 +37,8 @@ import {
   X,
   Eye,
   ClipboardCheck,
-  CloudUpload
+  CloudUpload,
+  BookOpen
 } from 'lucide-react';
 
 interface AeronaveDetailProps {
@@ -56,7 +57,7 @@ export default function AeronaveDetail({
   pilotoUser
 }: AeronaveDetailProps) {
   const isPilotOnly = userRole === 'piloto';
-  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'inspecoes' | 'voos' | 'laudos'>(
+  const [activeTab, setActiveTab] = useState<'mapa' | 'componentes' | 'inspecoes' | 'voos' | 'cadernetas' | 'laudos'>(
     isPilotOnly ? 'voos' : 'mapa'
   );
 
@@ -71,11 +72,13 @@ export default function AeronaveDetail({
   const [inspecoes, setInspecoes] = useState<InspecaoPeriodica[]>([]);
   const [voos, setVoos] = useState<HistoricoVoo[]>([]);
   const [revisoes, setRevisoes] = useState<RevisaoLaudo[]>([]);
+  const [cadernetas, setCadernetas] = useState<Caderneta[]>([]);
   const [loading, setLoading] = useState(false);
   const [alertFilter, setAlertFilter] = useState<'todos' | 'critico' | 'atencao'>('todos');
   const [mapaSistemaFilter, setMapaSistemaFilter] = useState<'todos' | 'celula' | 'motor' | 'helice'>('todos');
   const [compSistemaFilter, setCompSistemaFilter] = useState<'todos' | 'celula' | 'motor' | 'helice'>('todos');
   const [inspSistemaFilter, setInspSistemaFilter] = useState<'todos' | 'celula' | 'motor'>('todos');
+  const [cadFilter, setCadFilter] = useState<'todos' | 'celula' | 'motor' | 'helice'>('todos');
 
   // Formulário: Diário de Bordo (Voo)
   const [isVooFormOpen, setIsVooFormOpen] = useState(false);
@@ -169,6 +172,20 @@ export default function AeronaveDetail({
   const [attachmentName, setAttachmentName] = useState('');
   const [attachmentData, setAttachmentData] = useState('');
 
+  // Formulário: Cadernetas (Célula, Motor, Hélice)
+  const [isCadFormOpen, setIsCadFormOpen] = useState(false);
+  const [cadEditing, setCadEditing] = useState<Caderneta | null>(null);
+  const [cadTipo, setCadTipo] = useState<'celula' | 'motor' | 'helice'>('celula');
+  const [cadNome, setCadNome] = useState('');
+  const [cadFabricante, setCadFabricante] = useState('');
+  const [cadModelo, setCadModelo] = useState('');
+  const [cadNumeroSerie, setCadNumeroSerie] = useState('');
+  const [cadAttachments, setCadAttachments] = useState<AnexoComponente[]>([]);
+  const [cadError, setCadError] = useState<string | null>(null);
+  const [cadSaving, setCadSaving] = useState(false);
+  const [cadDeleteConfirmId, setCadDeleteConfirmId] = useState<string | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<AnexoComponente | null>(null);
+
   // --- CARGA DE DADOS (COM CACHE OFFLINE + FILA DE VOOS PENDENTES) ---
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -184,6 +201,9 @@ export default function AeronaveDetail({
         const onlyPending = pendingOrdered.filter((p) => !serverIds.has(p.id));
         setVoos([...onlyPending, ...cached.voos]);
         setRevisoes(cached.revisoes);
+        if (cached.cadernetas) {
+          setCadernetas(cached.cadernetas);
+        }
       } else {
         setVoos(pendingOrdered);
       }
@@ -196,11 +216,12 @@ export default function AeronaveDetail({
     }
 
     try {
-      const [compRes, inspRes, voosRes, revRes] = await Promise.all([
+      const [compRes, inspRes, voosRes, revRes, cadRes] = await Promise.all([
         fetch(`/api/componentes?aeronaveId=${aeronave.id}`),
         fetch(`/api/inspecoes-periodicas?aeronaveId=${aeronave.id}`),
         fetch(`/api/historico?aeronaveId=${aeronave.id}`),
-        fetch(`/api/revisoes?aeronaveId=${aeronave.id}`)
+        fetch(`/api/revisoes?aeronaveId=${aeronave.id}`),
+        fetch(`/api/cadernetas?aeronaveId=${aeronave.id}`)
       ]);
       
       if (compRes.ok && inspRes.ok && voosRes.ok && revRes.ok) {
@@ -210,10 +231,12 @@ export default function AeronaveDetail({
           voosRes.json(),
           revRes.json(),
         ]);
+        const cadData = cadRes.ok ? await cadRes.json() : [];
 
         setComponentes(compData);
         setInspecoes(inspData);
         setRevisoes(revData);
+        setCadernetas(cadData);
 
         const serverIds = new Set((voosData as HistoricoVoo[]).map((v) => v.id));
         const onlyPending = pendingOrdered.filter((p) => !serverIds.has(p.id));
@@ -224,6 +247,7 @@ export default function AeronaveDetail({
           inspecoes: inspData,
           voos: voosData,
           revisoes: revData,
+          cadernetas: cadData,
         });
       } else {
         await applyOfflineFallback();
@@ -649,6 +673,130 @@ export default function AeronaveDetail({
     }
   };
 
+  // --- SUBMISSÃO CADERNETAS (CÉLULA, MOTOR, HÉLICE) ---
+  const openNovaCaderneta = (defaultTipo: 'celula' | 'motor' | 'helice' = 'celula') => {
+    setCadEditing(null);
+    setCadTipo(defaultTipo);
+    setCadNome('');
+    setCadFabricante('');
+    setCadModelo('');
+    setCadNumeroSerie('');
+    setCadAttachments([]);
+    setCadError(null);
+    setIsCadFormOpen(true);
+  };
+
+  const handleEditCaderneta = (cad: Caderneta) => {
+    setCadEditing(cad);
+    setCadTipo(cad.tipo || 'celula');
+    setCadNome(cad.nome || '');
+    setCadFabricante(cad.fabricante || '');
+    setCadModelo(cad.modelo || '');
+    setCadNumeroSerie(cad.numeroSerie || '');
+    setCadAttachments(Array.isArray(cad.anexos) ? cad.anexos : []);
+    setCadError(null);
+    setIsCadFormOpen(true);
+  };
+
+  const handleCadPdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
+
+    setCadError(null);
+    const invalidType = files.filter(
+      (f) => f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')
+    );
+    const oversized = files.filter((f) => f.size > 15 * 1024 * 1024);
+
+    if (invalidType.length > 0 || oversized.length > 0) {
+      const msgs: string[] = [];
+      if (invalidType.length > 0) {
+        msgs.push(`Apenas arquivos PDF são aceitos (${invalidType.map((f) => f.name).join(', ')} ignorado).`);
+      }
+      if (oversized.length > 0) {
+        msgs.push(`Arquivo(s) acima de 15MB ignorado(s): ${oversized.map((f) => f.name).join(', ')}.`);
+      }
+      setCadError(msgs.join(' '));
+    }
+
+    const validFiles = files.filter(
+      (f) =>
+        (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) &&
+        f.size <= 15 * 1024 * 1024
+    );
+
+    validFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const data = reader.result as string;
+        setCadAttachments((prev) => [...prev, { nome: file.name, dados: data }]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveCadAttachment = (index: number) => {
+    setCadAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveCaderneta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cadNome.trim()) {
+      setCadError('Informe o Nome da caderneta.');
+      return;
+    }
+
+    setCadSaving(true);
+    setCadError(null);
+
+    const payload = {
+      id: cadEditing?.id,
+      aeronaveId: aeronave.id,
+      tipo: cadTipo,
+      nome: cadNome.trim(),
+      fabricante: cadFabricante.trim(),
+      modelo: cadModelo.trim(),
+      numeroSerie: cadNumeroSerie.trim(),
+      anexos: cadAttachments,
+    };
+
+    try {
+      const method = cadEditing ? 'PUT' : 'POST';
+      const response = await fetch('/api/cadernetas', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (response.ok) {
+        setIsCadFormOpen(false);
+        setCadEditing(null);
+        await fetchData();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        setCadError(data.error || 'Erro ao salvar caderneta.');
+      }
+    } catch (err) {
+      console.error(err);
+      setCadError('Sem conexão com o servidor ao salvar caderneta.');
+    } finally {
+      setCadSaving(false);
+    }
+  };
+
+  const handleDeleteCaderneta = async (id: string) => {
+    try {
+      const res = await fetch(`/api/cadernetas/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setCadDeleteConfirmId(null);
+        await fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // --- SUBMISSÃO REVISÃO / LAUDO ---
   const handleAddRevisao = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -866,6 +1014,18 @@ export default function AeronaveDetail({
           >
             <History className="w-4 h-4" />
             Diário de Bordo ({voos.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('cadernetas')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold cursor-pointer transition-all rounded-xl ${
+              activeTab === 'cadernetas'
+                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            Cadernetas ({cadernetas.length})
           </button>
 
           <button
@@ -2751,6 +2911,517 @@ export default function AeronaveDetail({
           )
         )}
 
+        {/* --- TAB: CADERNETAS (CÉLULA, MOTOR, HÉLICE) --- */}
+        {!loading && activeTab === 'cadernetas' && (
+          isCadFormOpen ? (
+            <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-850">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-sky-400" />
+                    {userRole === 'oficina'
+                      ? 'Detalhes da Caderneta'
+                      : cadEditing
+                      ? 'Editar Caderneta'
+                      : 'Cadastrar Nova Caderneta'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Registre Caderneta de Célula, Motor ou Hélice com os dados de identificação e múltiplos PDFs anexados.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCadFormOpen(false);
+                    setCadEditing(null);
+                    setCadError(null);
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer border border-slate-800"
+                >
+                  ✕ Voltar
+                </button>
+              </div>
+
+              {cadError && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-medium px-4 py-3 rounded-xl flex items-center justify-between gap-2">
+                  <span>{cadError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setCadError(null)}
+                    className="text-red-300 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveCaderneta} className="space-y-6">
+                <fieldset disabled={userRole === 'oficina'} className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-2">Tipo de Caderneta *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {(
+                        [
+                          { id: 'celula', label: 'Caderneta de Célula', activeCls: 'bg-sky-500/15 border-sky-500/50 text-sky-300', dotCls: 'bg-sky-400' },
+                          { id: 'motor', label: 'Caderneta de Motor', activeCls: 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300', dotCls: 'bg-emerald-400' },
+                          { id: 'helice', label: 'Caderneta de Hélice', activeCls: 'bg-amber-500/15 border-amber-500/50 text-amber-300', dotCls: 'bg-amber-400' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setCadTipo(opt.id)}
+                          className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                            cadTipo === opt.id
+                              ? opt.activeCls
+                              : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${opt.dotCls}`} />
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Nome *</label>
+                      <input
+                        type="text"
+                        required
+                        value={cadNome}
+                        onChange={(e) => setCadNome(e.target.value)}
+                        placeholder="Ex: Caderneta de Motor #1 / Caderneta de Célula PT-XYZ"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Fabricante</label>
+                      <input
+                        type="text"
+                        value={cadFabricante}
+                        onChange={(e) => setCadFabricante(e.target.value)}
+                        placeholder="Ex: Lycoming, Cessna, Hartzell"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Modelo</label>
+                      <input
+                        type="text"
+                        value={cadModelo}
+                        onChange={(e) => setCadModelo(e.target.value)}
+                        placeholder="Ex: IO-360-A1B6, 172S"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5">Número de Série</label>
+                      <input
+                        type="text"
+                        value={cadNumeroSerie}
+                        onChange={(e) => setCadNumeroSerie(e.target.value)}
+                        placeholder="Ex: S/N L-34512-51E"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-sky-500 text-slate-100 placeholder-slate-600 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Upload Múltiplo de PDFs */}
+                  <div className="space-y-3">
+                    <label className="block text-xs font-semibold text-slate-400">
+                      Anexar PDFs da Caderneta (Múltiplos arquivos PDF permitidos)
+                    </label>
+
+                    {userRole !== 'oficina' && (
+                      <div className="relative border-2 border-dashed border-slate-700 hover:border-sky-500/60 bg-slate-950/60 rounded-2xl p-5 text-center transition-all cursor-pointer group">
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,application/pdf"
+                          onChange={handleCadPdfChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <div className="space-y-1.5">
+                          <Upload className="w-6 h-6 text-slate-500 group-hover:text-sky-400 mx-auto transition-colors" />
+                          <p className="text-xs text-slate-300 font-semibold">
+                            Clique ou arraste um ou mais PDFs aqui
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            Formato exclusivo PDF • Máximo recomendado: 15MB por arquivo
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {cadAttachments.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold text-slate-400">
+                          PDFs Anexados ({cadAttachments.length})
+                        </p>
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {cadAttachments.map((anexo, idx) => (
+                            <div
+                              key={`${anexo.nome}-${idx}`}
+                              className="flex items-center justify-between gap-3 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/25 flex-shrink-0">
+                                  PDF
+                                </span>
+                                <span className="text-xs text-slate-200 font-medium truncate">
+                                  {anexo.nome}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPdfPreview(anexo)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/25 rounded-lg transition-colors cursor-pointer"
+                                  title="Visualizar PDF"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Abrir
+                                </button>
+                                <a
+                                  href={anexo.dados}
+                                  download={anexo.nome}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                  title="Baixar PDF"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  Baixar
+                                </a>
+                                {userRole !== 'oficina' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCadAttachment(idx)}
+                                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                    title="Remover PDF"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </fieldset>
+
+                <div className="pt-5 border-t border-slate-800 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCadFormOpen(false);
+                      setCadEditing(null);
+                      setCadError(null);
+                    }}
+                    className="px-5 py-3 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                  >
+                    {userRole === 'oficina' ? 'Fechar' : 'Cancelar'}
+                  </button>
+                  {userRole !== 'oficina' && (
+                    <button
+                      type="submit"
+                      disabled={cadSaving}
+                      className="px-6 py-3 text-xs font-bold text-white bg-sky-500 hover:bg-sky-600 disabled:opacity-50 rounded-xl transition-all cursor-pointer shadow-lg shadow-sky-500/10 active:scale-[0.98]"
+                    >
+                      {cadSaving
+                        ? 'Salvando...'
+                        : cadEditing
+                        ? 'Salvar Alterações da Caderneta'
+                        : 'Salvar Caderneta'}
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-display font-bold text-white tracking-tight">
+                    Cadernetas da Aeronave
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Gerencie as cadernetas de Célula, Motor e Hélice com identificação completa e múltiplos PDFs anexados.
+                  </p>
+                </div>
+                {userRole !== 'oficina' && (
+                  <button
+                    type="button"
+                    onClick={() => openNovaCaderneta(cadFilter === 'todos' ? 'celula' : cadFilter)}
+                    className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-sky-500/10 self-start sm:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nova Caderneta
+                  </button>
+                )}
+              </div>
+
+              {/* Filtro por tipo de caderneta */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-700/50 w-fit">
+                {(
+                  [
+                    { id: 'todos', label: `Todas (${cadernetas.length})` },
+                    { id: 'celula', label: `Caderneta de Célula (${cadernetas.filter(c => c.tipo === 'celula').length})` },
+                    { id: 'motor', label: `Caderneta de Motor (${cadernetas.filter(c => c.tipo === 'motor').length})` },
+                    { id: 'helice', label: `Caderneta de Hélice (${cadernetas.filter(c => c.tipo === 'helice').length})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setCadFilter(tab.id)}
+                    className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                      cadFilter === tab.id
+                        ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {(() => {
+                const cadSections = (
+                  [
+                    {
+                      key: 'celula' as const,
+                      title: 'Caderneta de Célula',
+                      dotClass: 'bg-sky-400',
+                      badgeClass: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+                      items: cadernetas.filter((c) => c.tipo === 'celula'),
+                    },
+                    {
+                      key: 'motor' as const,
+                      title: 'Caderneta de Motor',
+                      dotClass: 'bg-emerald-400',
+                      badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                      items: cadernetas.filter((c) => c.tipo === 'motor'),
+                    },
+                    {
+                      key: 'helice' as const,
+                      title: 'Caderneta de Hélice',
+                      dotClass: 'bg-amber-400',
+                      badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                      items: cadernetas.filter((c) => c.tipo === 'helice'),
+                    },
+                  ]
+                ).filter((sec) => cadFilter === 'todos' || sec.key === cadFilter);
+
+                const totalVisible = cadSections.reduce((acc, sec) => acc + sec.items.length, 0);
+
+                if (totalVisible === 0) {
+                  return (
+                    <div className="text-center py-16 border border-dashed border-slate-700/60 bg-slate-900/10 rounded-2xl p-8 text-slate-400 text-xs font-mono space-y-3">
+                      <p>
+                        Nenhuma caderneta cadastrada{cadFilter !== 'todos' ? ' nesta categoria' : ''}.
+                      </p>
+                      {userRole !== 'oficina' && (
+                        <button
+                          type="button"
+                          onClick={() => openNovaCaderneta(cadFilter === 'todos' ? 'celula' : cadFilter)}
+                          className="inline-flex items-center gap-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-sans font-semibold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Cadastrar {cadFilter === 'motor' ? 'Caderneta de Motor' : cadFilter === 'helice' ? 'Caderneta de Hélice' : cadFilter === 'celula' ? 'Caderneta de Célula' : 'Primeira Caderneta'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-8">
+                    {cadSections.map((sec) => {
+                      if (cadFilter === 'todos' && sec.items.length === 0) return null;
+                      return (
+                        <div key={sec.key} className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                            <div className="flex items-center gap-2.5">
+                              <span className={`h-2.5 w-2.5 rounded-full ${sec.dotClass}`} />
+                              <h4 className="font-display font-bold text-sm text-white uppercase tracking-wider">
+                                {sec.title}
+                              </h4>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sec.badgeClass}`}>
+                                {sec.items.length} {sec.items.length === 1 ? 'caderneta' : 'cadernetas'}
+                              </span>
+                            </div>
+                            {userRole !== 'oficina' && (
+                              <button
+                                type="button"
+                                onClick={() => openNovaCaderneta(sec.key)}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-400 hover:text-sky-300 cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Nova {sec.title}
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {sec.items.map((cad) => {
+                              const pdfs = Array.isArray(cad.anexos) ? cad.anexos : [];
+                              return (
+                                <div
+                                  key={cad.id}
+                                  className="bg-slate-900 border border-slate-700/65 rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-md hover:border-slate-600/80 transition-all"
+                                  id={`cad-card-${cad.id}`}
+                                >
+                                  <div className="space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="space-y-1 min-w-0">
+                                        <span className={`inline-block text-[9px] px-2 py-0.5 rounded-lg font-extrabold uppercase tracking-wider border ${sec.badgeClass}`}>
+                                          {sec.title}
+                                        </span>
+                                        <h5 className="text-sm font-display font-bold text-white truncate">
+                                          {cad.nome}
+                                        </h5>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 flex-shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditCaderneta(cad)}
+                                          className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                          title={userRole === 'oficina' ? 'Visualizar Caderneta' : 'Editar Caderneta'}
+                                        >
+                                          {userRole === 'oficina' ? (
+                                            <Eye className="w-3.5 h-3.5" />
+                                          ) : (
+                                            <History className="w-3.5 h-3.5" />
+                                          )}
+                                        </button>
+                                        {userRole !== 'oficina' && (
+                                          cadDeleteConfirmId === cad.id ? (
+                                            <div className="flex items-center gap-1 bg-red-950/60 border border-red-500/40 rounded-lg px-2 py-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleDeleteCaderneta(cad.id)}
+                                                className="text-[10px] font-bold text-red-300 hover:text-white cursor-pointer"
+                                              >
+                                                Confirmar
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setCadDeleteConfirmId(null)}
+                                                className="text-[10px] font-semibold text-slate-400 hover:text-white cursor-pointer ml-1"
+                                              >
+                                                Cancelar
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => setCadDeleteConfirmId(cad.id)}
+                                              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                                              title="Excluir Caderneta"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2 bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 text-[11px]">
+                                      <div className="min-w-0">
+                                        <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                                          Fabricante
+                                        </span>
+                                        <span className="font-semibold text-slate-200 truncate block">
+                                          {cad.fabricante || '-'}
+                                        </span>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                                          Modelo
+                                        </span>
+                                        <span className="font-semibold text-slate-200 truncate block">
+                                          {cad.modelo || '-'}
+                                        </span>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <span className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                                          Nº de Série
+                                        </span>
+                                        <span className="font-mono font-semibold text-slate-200 truncate block">
+                                          {cad.numeroSerie || '-'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="border-t border-slate-800/70 pt-3 space-y-2">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="font-semibold text-slate-400 flex items-center gap-1.5">
+                                        <Paperclip className="w-3.5 h-3.5 text-sky-400" />
+                                        PDFs Anexados ({pdfs.length})
+                                      </span>
+                                    </div>
+                                    {pdfs.length === 0 ? (
+                                      <p className="text-[11px] text-slate-500 italic">Nenhum PDF anexado ainda.</p>
+                                    ) : (
+                                      <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                                        {pdfs.map((anexo, idx) => (
+                                          <div
+                                            key={`${cad.id}-pdf-${idx}`}
+                                            className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800/70 rounded-lg px-2.5 py-1.5 text-xs"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/25 flex-shrink-0">
+                                                PDF
+                                              </span>
+                                              <span className="text-[11px] text-slate-200 truncate">
+                                                {anexo.nome}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 flex-shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => setPdfPreview(anexo)}
+                                                className="p-1 text-sky-400 hover:text-sky-300 hover:bg-slate-800 rounded transition-colors cursor-pointer"
+                                                title="Visualizar PDF"
+                                              >
+                                                <Eye className="w-3.5 h-3.5" />
+                                              </button>
+                                              <a
+                                                href={anexo.dados}
+                                                download={anexo.nome}
+                                                className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                                                title="Baixar PDF"
+                                              >
+                                                <Download className="w-3.5 h-3.5" />
+                                              </a>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )
+        )}
+
         {!loading && activeTab === 'laudos' && (
           isRevFormOpen ? (
             <div className="bg-slate-900 rounded-2xl border border-slate-700/60 shadow-2xl p-6 sm:p-8 space-y-6 w-full max-w-3xl mx-auto animate-fade-in">
@@ -2978,6 +3649,53 @@ export default function AeronaveDetail({
           )
         )}
       </div>
+
+      {/* Modal de Visualização Inline de PDF */}
+      {pdfPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPdfPreview(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700/70 rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/25 flex-shrink-0">
+                  PDF
+                </span>
+                <span className="text-sm font-semibold text-white truncate">{pdfPreview.nome}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <a
+                  href={pdfPreview.dados}
+                  download={pdfPreview.nome}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/25 rounded-lg transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Baixar PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPdfPreview(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title="Fechar visualização"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 bg-slate-950">
+              <iframe
+                src={pdfPreview.dados}
+                title={pdfPreview.nome}
+                className="w-full h-[75vh] rounded-xl bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

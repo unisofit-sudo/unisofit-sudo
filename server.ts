@@ -38,7 +38,11 @@ import {
   getInspecoesPeriodicas,
   addInspecaoPeriodica,
   updateInspecaoPeriodica,
-  deleteInspecaoPeriodica
+  deleteInspecaoPeriodica,
+  getCadernetas,
+  addCaderneta,
+  updateCaderneta,
+  deleteCaderneta
 } from './src/server/db.js';
 
 async function startServer() {
@@ -574,6 +578,67 @@ async function startServer() {
   app.delete('/api/revisoes/:id', async (req, res) => {
     try {
       await deleteRevisao(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- CADERNETAS (CÉLULA, MOTOR E HÉLICE) ---
+  app.get('/api/cadernetas', async (req, res) => {
+    try {
+      const aeronaveId = req.query.aeronaveId as string;
+      const list = await getCadernetas(aeronaveId);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/cadernetas', async (req, res) => {
+    try {
+      const cad = req.body;
+      if (!cad.aeronaveId || !String(cad.nome || '').trim()) {
+        res.status(400).json({ error: 'Aeronave e Nome da caderneta são obrigatórios.' });
+        return;
+      }
+      if (!cad.id) cad.id = 'cad_' + Math.random().toString(36).substr(2, 9);
+      cad.nome = String(cad.nome).trim();
+      cad.fabricante = String(cad.fabricante || '').trim();
+      cad.modelo = String(cad.modelo || '').trim();
+      cad.numeroSerie = String(cad.numeroSerie || '').trim();
+      cad.tipo = cad.tipo === 'motor' || cad.tipo === 'helice' ? cad.tipo : 'celula';
+      cad.anexos = Array.isArray(cad.anexos) ? cad.anexos : [];
+      const created = await addCaderneta(cad);
+      res.status(201).json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/cadernetas', async (req, res) => {
+    try {
+      const cad = req.body;
+      if (!cad.id || !cad.aeronaveId || !String(cad.nome || '').trim()) {
+        res.status(400).json({ error: 'ID, Aeronave e Nome da caderneta são obrigatórios.' });
+        return;
+      }
+      cad.nome = String(cad.nome).trim();
+      cad.fabricante = String(cad.fabricante || '').trim();
+      cad.modelo = String(cad.modelo || '').trim();
+      cad.numeroSerie = String(cad.numeroSerie || '').trim();
+      cad.tipo = cad.tipo === 'motor' || cad.tipo === 'helice' ? cad.tipo : 'celula';
+      cad.anexos = Array.isArray(cad.anexos) ? cad.anexos : [];
+      const updated = await updateCaderneta(cad);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/cadernetas/:id', async (req, res) => {
+    try {
+      await deleteCaderneta(req.params.id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

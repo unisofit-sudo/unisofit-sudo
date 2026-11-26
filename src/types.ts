@@ -141,6 +141,18 @@ export interface InspecaoPeriodica {
   created_at?: string;
 }
 
+export interface Caderneta {
+  id: string;
+  aeronaveId: string;
+  tipo: 'celula' | 'motor' | 'helice';
+  nome: string;
+  fabricante: string;
+  modelo: string;
+  numeroSerie: string;
+  anexos: AnexoComponente[];
+  created_at?: string;
+}
+
 // Interface para Alertas Calculados
 export interface AlertaManutencao {
   idComponente: string;

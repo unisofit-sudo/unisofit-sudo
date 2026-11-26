@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
-import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, UsuarioOficina, UsuarioPiloto } from '../types';
+import { Cliente, Aeronave, HistoricoVoo, ComponenteControlado, InspecaoPeriodica, RevisaoLaudo, UsuarioOficina, UsuarioPiloto, Caderneta } from '../types';
 
 let pool: Pool | null = null;
 let dbConnectionError: string | null = null;
@@ -322,6 +322,19 @@ export async function initDb() {
           oficina_executante VARCHAR(255),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT fk_aeronave_insp FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS cadernetas (
+          id VARCHAR(100) PRIMARY KEY,
+          aeronave_id VARCHAR(100) NOT NULL,
+          tipo VARCHAR(50) NOT NULL DEFAULT 'celula',
+          nome VARCHAR(255) NOT NULL,
+          fabricante VARCHAR(255),
+          modelo VARCHAR(255),
+          numero_serie VARCHAR(100),
+          anexos TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_aeronave_cad FOREIGN KEY (aeronave_id) REFERENCES aeronaves(id) ON DELETE CASCADE
         );
 
         -- Executa migrações automáticas de dados dos componentes para representação direta
@@ -1141,3 +1154,134 @@ export async function deleteInspecaoPeriodica(id: string): Promise<void> {
   }
 }
 
+// CADERNETAS (CÉLULA, MOTOR E HÉLICE)
+function normalizeCadernetaTipo(tipo?: string): 'celula' | 'motor' | 'helice' {
+  if (tipo === 'motor' || tipo === 'helice') return tipo;
+  return 'celula';
+}
+
+export async function getCadernetas(aeronaveId?: string): Promise<Caderneta[]> {
+  try {
+    const p = checkPool();
+    let query = 'SELECT * FROM cadernetas';
+    const params: any[] = [];
+    if (aeronaveId) {
+      query += ' WHERE aeronave_id = $1';
+      params.push(aeronaveId);
+    }
+    query += ' ORDER BY created_at DESC, nome ASC';
+    const res = await p.query(query, params);
+    return res.rows.map(row => {
+      let anexosList: { nome: string; dados: string }[] = [];
+      if (row.anexos) {
+        try {
+          const parsed = typeof row.anexos === 'string' ? JSON.parse(row.anexos) : row.anexos;
+          if (Array.isArray(parsed)) {
+            anexosList = parsed.filter((a: any) => a && a.nome && a.dados);
+          }
+        } catch {
+          anexosList = [];
+        }
+      }
+      return {
+        id: row.id,
+        aeronaveId: row.aeronave_id,
+        tipo: normalizeCadernetaTipo(row.tipo),
+        nome: row.nome,
+        fabricante: row.fabricante || '',
+        modelo: row.modelo || '',
+        numeroSerie: row.numero_serie || '',
+        anexos: anexosList,
+        created_at: row.created_at
+      };
+    });
+  } catch (err: any) {
+    setDbConnectionError('Erro na consulta de cadernetas: ' + err.message);
+    throw err;
+  }
+}
+
+export async function addCaderneta(cad: Caderneta): Promise<Caderneta> {
+  try {
+    const p = checkPool();
+    const tipoNorm = normalizeCadernetaTipo(cad.tipo);
+    const anexosList = Array.isArray(cad.anexos)
+      ? cad.anexos.filter(a => a && a.nome && a.dados)
+      : [];
+    const anexosJson = anexosList.length > 0 ? JSON.stringify(anexosList) : null;
+
+    await p.query(
+      `INSERT INTO cadernetas (id, aeronave_id, tipo, nome, fabricante, modelo, numero_serie, anexos)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        cad.id,
+        cad.aeronaveId,
+        tipoNorm,
+        cad.nome,
+        cad.fabricante || '',
+        cad.modelo || '',
+        cad.numeroSerie || '',
+        anexosJson
+      ]
+    );
+
+    return {
+      ...cad,
+      tipo: tipoNorm,
+      fabricante: cad.fabricante || '',
+      modelo: cad.modelo || '',
+      numeroSerie: cad.numeroSerie || '',
+      anexos: anexosList
+    };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao adicionar caderneta: ' + err.message);
+    throw err;
+  }
+}
+
+export async function updateCaderneta(cad: Caderneta): Promise<Caderneta> {
+  try {
+    const p = checkPool();
+    const tipoNorm = normalizeCadernetaTipo(cad.tipo);
+    const anexosList = Array.isArray(cad.anexos)
+      ? cad.anexos.filter(a => a && a.nome && a.dados)
+      : [];
+    const anexosJson = anexosList.length > 0 ? JSON.stringify(anexosList) : null;
+
+    await p.query(
+      `UPDATE cadernetas SET aeronave_id = $1, tipo = $2, nome = $3, fabricante = $4, modelo = $5, numero_serie = $6, anexos = $7 WHERE id = $8`,
+      [
+        cad.aeronaveId,
+        tipoNorm,
+        cad.nome,
+        cad.fabricante || '',
+        cad.modelo || '',
+        cad.numeroSerie || '',
+        anexosJson,
+        cad.id
+      ]
+    );
+
+    return {
+      ...cad,
+      tipo: tipoNorm,
+      fabricante: cad.fabricante || '',
+      modelo: cad.modelo || '',
+      numeroSerie: cad.numeroSerie || '',
+      anexos: anexosList
+    };
+  } catch (err: any) {
+    setDbConnectionError('Erro ao atualizar caderneta: ' + err.message);
+    throw err;
+  }
+}
+
+export async function deleteCaderneta(id: string): Promise<void> {
+  try {
+    const p = checkPool();
+    await p.query('DELETE FROM cadernetas WHERE id = $1', [id]);
+  } catch (err: any) {
+    setDbConnectionError('Erro ao deletar caderneta: ' + err.message);
+    throw err;
+  }
+}

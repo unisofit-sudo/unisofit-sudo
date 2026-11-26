@@ -1,5 +1,6 @@
 import {
   Aeronave,
+  Caderneta,
   Cliente,
   ComponenteControlado,
   HistoricoVoo,
@@ -18,6 +19,7 @@ export interface AircraftDetailSnapshot {
   inspecoes: InspecaoPeriodica[];
   voos: HistoricoVoo[];
   revisoes: RevisaoLaudo[];
+  cadernetas?: Caderneta[];
   updatedAt: string;
 }
 

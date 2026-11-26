@@ -231,11 +231,12 @@ export default function App() {
 
     for (const aero of targetList) {
       try {
-        const [compRes, inspRes, voosRes, revRes] = await Promise.all([
+        const [compRes, inspRes, voosRes, revRes, cadRes] = await Promise.all([
           fetch(`/api/componentes?aeronaveId=${aero.id}`),
           fetch(`/api/inspecoes-periodicas?aeronaveId=${aero.id}`),
           fetch(`/api/historico?aeronaveId=${aero.id}`),
           fetch(`/api/revisoes?aeronaveId=${aero.id}`),
+          fetch(`/api/cadernetas?aeronaveId=${aero.id}`),
         ]);
         if (compRes.ok && inspRes.ok && voosRes.ok && revRes.ok) {
           const [componentes, inspecoes, voos, revisoes] = await Promise.all([
@@ -244,11 +245,13 @@ export default function App() {
             voosRes.json(),
             revRes.json(),
           ]);
+          const cadernetas = cadRes.ok ? await cadRes.json() : [];
           await saveAeronaveDetailCache(aero.id, {
             componentes,
             inspecoes,
             voos,
             revisoes,
+            cadernetas,
           });
         }
       } catch {
